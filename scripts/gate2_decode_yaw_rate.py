@@ -16,7 +16,6 @@ from __future__ import annotations
 
 
 def main(argv=None) -> int:
-    """Run Gate 2 (STUB)."""
     raise NotImplementedError("week 1: needs expert data + cache (spec 'Gates')")
 
 

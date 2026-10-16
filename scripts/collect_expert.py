@@ -15,7 +15,6 @@ from __future__ import annotations
 
 
 def main(argv=None) -> int:
-    """Collect expert trajectories (STUB)."""
     raise NotImplementedError("week 1: needs the corridor env and scripted expert (spec 'Scripted expert')")
 
 

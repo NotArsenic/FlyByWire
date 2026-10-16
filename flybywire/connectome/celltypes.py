@@ -66,7 +66,6 @@ class Connectome:
         lines.append(f"N={self.n}  edges={self.n_edges}  density={self.density:.4f}  source={self.source}")
         return "\n".join(lines)
 
-    # ------------------------------------------------------------------ io
     def save(self, path: str | Path) -> None:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -119,10 +118,7 @@ _PB_GLOM = re.compile(r"(?:^|[^A-Za-z0-9])(?:PB)?_?([LR])([1-9])(?![0-9])")
 
 
 def parse_pb_glomerulus(instance: str) -> tuple[str, int] | None:
-    """Return (side, glomerulus 1..9) parsed from an instance string like ``EPG_R3`` / ``EPG(PB08)_L4``.
-
-    Returns None if no glomerulus can be parsed.
-    """
+    """(side, glomerulus 1..9) parsed from an instance name like ``EPG_R3`` / ``EPG(PB08)_L4``, or None."""
     m = _PB_GLOM.findall(str(instance))
     if not m:
         return None

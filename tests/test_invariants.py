@@ -17,7 +17,6 @@ def _inputs(b=2, t=8, seed=0):
     return torch.randn(b, t, 8, 721, generator=g)
 
 
-# 1 -----------------------------------------------------------------------------------------------
 def test_inv1_core_has_no_cross_neuron_modules(model):
     """The core owns no submodules at all (no LayerNorm / attention / Linear over neurons)."""
     assert list(model.core.children()) == []
@@ -37,7 +36,6 @@ def test_inv1_jacobian_follows_mask(model, toy):
     assert torch.count_nonzero(J[M.T]) > 0  # and the mask does carry signal
 
 
-# 2 -----------------------------------------------------------------------------------------------
 def test_inv2_grad_zero_off_mask(model, toy):
     out = model.run(_inputs(), model.init_state(2))
     loss = out["action_mean"].pow(2).sum() + out["heading"].pow(2).sum()
@@ -49,7 +47,6 @@ def test_inv2_grad_zero_off_mask(model, toy):
     assert torch.count_nonzero(g[M]) > 0
 
 
-# 3 -----------------------------------------------------------------------------------------------
 def test_inv3_input_only_on_er(model, toy):
     s = torch.randn(5, 8)
     u = model.inproj(s)
@@ -59,7 +56,6 @@ def test_inv3_input_only_on_er(model, toy):
     assert torch.count_nonzero(u[:, torch.as_tensor(er)]) > 0
 
 
-# 4 -----------------------------------------------------------------------------------------------
 def test_inv4_actor_reads_only_pfl3(model, toy):
     r = torch.rand(3, toy.n)
     r2 = r.clone()
@@ -88,7 +84,6 @@ def test_inv4_critic_does_not_backprop_into_core(model):
     assert any(p.grad is not None and torch.count_nonzero(p.grad) > 0 for p in model.critic.parameters())
 
 
-# 5 -----------------------------------------------------------------------------------------------
 @pytest.mark.flyvis
 @pytest.mark.gpu
 def test_inv5_flyvis_receives_no_gradients(random_lptc):
@@ -105,7 +100,6 @@ def test_inv5_flyvis_receives_no_gradients(random_lptc):
     assert all(p.grad is None for p in st.net.parameters())
 
 
-# 6 -----------------------------------------------------------------------------------------------
 def test_inv6_lesion_rates_exactly_zero_every_step(model, toy):
     x = _inputs(t=12)
     for group in ("EPG", "PEN", "D7"):
@@ -139,7 +133,6 @@ def test_inv6_lesion_toggles_between_steps(model, toy):
     assert torch.all(model.core.keep == 1)
 
 
-# 7 -----------------------------------------------------------------------------------------------
 def test_inv7_conditions_share_neurons_and_groups(toy):
     conds = {mt: apply_mask_type(toy, mt, seed=1) for mt in ("real", "rewire", "er")}
     for c in conds.values():
@@ -152,7 +145,6 @@ def test_inv7_conditions_share_neurons_and_groups(toy):
     assert not np.array_equal(conds["rewire"].M, toy.M)  # only the edges differ
 
 
-# 8 -----------------------------------------------------------------------------------------------
 def test_inv8_rewire_preserves_degrees(toy):
     M2, stats = directed_rewire(toy.M, swaps_per_edge=10, seed=3)
     assert np.array_equal(M2.sum(0), toy.M.sum(0))  # in-degree
@@ -163,7 +155,6 @@ def test_inv8_rewire_preserves_degrees(toy):
     assert stats.surviving_fraction < 1.0
 
 
-# 9 -----------------------------------------------------------------------------------------------
 def test_inv9_heading_target_relative_to_start():
     yaw0 = 3.0
     yaw = np.array([3.0, 3.1, -3.1, 2.9, 3.0 + 2 * np.pi])
@@ -179,7 +170,6 @@ def test_inv9_heading_target_relative_to_start():
     assert np.allclose(tgt[0], [0.0, 1.0])
 
 
-# 10 ----------------------------------------------------------------------------------------------
 def test_inv10_all_floating_tensors_fp32(model):
     """Every floating-point parameter and buffer is fp32 (bool masks / long index buffers are not floats)."""
     for name, p in model.named_parameters():

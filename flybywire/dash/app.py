@@ -14,7 +14,6 @@ from __future__ import annotations
 
 
 def main() -> None:
-    """Build the Streamlit page (STUB)."""
     raise NotImplementedError("dashboard (spec 'Dashboard and video')")
 
 

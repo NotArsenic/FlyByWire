@@ -174,7 +174,6 @@ flybywire/
 scripts/                    check_env, setup_env, gate1, calibrate, build_cache, count_params, smoke, stubs
 tests/                      invariants 1–10 and component tests
 docs/DECISIONS.md           dated decisions and every deviation from the spec
-paper/                      writeup skeleton and references
 ```
 
 ## Results
@@ -219,10 +218,13 @@ streamlit run flybywire/dash/app.py   # live dashboard (stub)
 - FlyWire: Dorkenwald, S., et al. (2024). Neuronal wiring diagram of an adult brain. *Nature*;
   Schlegel, P., et al. (2024). Whole-brain annotation and multi-connectome cell typing of
   Drosophila. *Nature*.
-- Central complex: Hulse, B. K., et al. (2021). *eLife*.
+- Central complex: Hulse, B. K., et al. (2021). *eLife*; Seelig, J. D., & Jayaraman, V. (2015).
+  *Nature*; Turner-Evans, D., et al. (2017). *eLife*; Green, J., et al. (2017). *Nature*;
+  Westeinde, E. A., et al. (2024). *Nature*.
+- Self-motion flow templates and LPTCs: Krapp, H. G., & Hengstenberg, R. (1996). *Nature*;
+  Longuet-Higgins, H. C., & Prazdny, K. (1980). *Proc. R. Soc. Lond. B*.
 - gym-pybullet-drones: Panerati, J., et al. (2021). IROS.
-
-The full list is in `paper/references.md`.
+- PPO: Schulman, J., et al. (2017). arXiv.
 
 ## License
 

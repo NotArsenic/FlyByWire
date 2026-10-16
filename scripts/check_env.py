@@ -51,9 +51,6 @@ def _run(cmd: list[str], timeout: float = 20.0) -> str | None:
         return None
 
 
-# --------------------------------------------------------------------------- system
-
-
 def check_wsl() -> None:
     try:
         version = Path("/proc/version").read_text()
@@ -139,9 +136,6 @@ def check_gpu() -> None:
         row(f"GPU {i}", "PASS", line.strip())
 
 
-# --------------------------------------------------------------------------- env
-
-
 def check_torch() -> None:
     try:
         import torch
@@ -165,7 +159,7 @@ def check_torch() -> None:
         b = (a @ a).sum().item()
         torch.cuda.synchronize()
         row("GPU matmul", "PASS", f"512x512 matmul ok (checksum {b:.3g})")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         row("GPU matmul", "FAIL", f"{type(e).__name__}: {e}")
 
 
@@ -183,7 +177,7 @@ def check_flyvis() -> None:
         import flyvis  # noqa: F401
 
         row("flyvis import", "PASS", f"flyvis {version('flyvis')}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         row("flyvis import", "SKIP" if isinstance(e, ImportError) else "FAIL", f"{type(e).__name__}: {e}")
         return
     root = Path(os.environ["FLYVIS_ROOT_DIR"])
@@ -230,7 +224,7 @@ def check_pybullet() -> None:
             if plugin >= 0:
                 egl_ms = _time_render(p, p.ER_BULLET_HARDWARE_OPENGL)
                 p.unloadPlugin(plugin)
-        except Exception:  # noqa: BLE001
+        except Exception:
             egl_ms = None
         if egl_ms is None:
             row("PyBullet EGL", "WARN", f"EGL plugin failed to load; TinyRenderer {tiny_ms:.2f} ms/frame @160x160")
@@ -257,11 +251,8 @@ def check_gymnasium() -> None:
         import gym_pybullet_drones  # noqa: F401
 
         row("gym-pybullet-drones", "PASS", f"gym-pybullet-drones {version('gym-pybullet-drones')}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         row("gym-pybullet-drones", "SKIP", f"{type(e).__name__}: {e}")
-
-
-# --------------------------------------------------------------------------- main
 
 
 def print_table() -> None:

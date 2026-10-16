@@ -115,7 +115,6 @@ def test_ring_plot_labels_layout(toy):
     plt.close(fig)
 
 
-# ---------------------------------------------------------------------------------------- flyvis
 @pytest.mark.flyvis
 @pytest.mark.gpu
 def test_stepper_state_carry_and_per_env_reset():

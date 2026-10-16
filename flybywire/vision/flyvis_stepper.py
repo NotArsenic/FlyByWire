@@ -86,7 +86,6 @@ class FlyvisStepper:
 
         self._AutoDeref = AutoDeref
 
-    # ------------------------------------------------------------------ state
     @property
     def batch_size(self) -> int:
         return 0 if self.state is None else int(self.state.shape[0])
@@ -115,7 +114,6 @@ class FlyvisStepper:
         x[:, self._input_index] = hexals[:, None, :]
         return x
 
-    # ------------------------------------------------------------------ step
     @torch.no_grad()
     def step(self, hexals: torch.Tensor) -> torch.Tensor:
         """Advance one ``dt`` with a fresh frame. ``hexals``: (B, 721) in [0, 1]. Returns (B, 8, 721)."""

@@ -26,7 +26,7 @@ def _flyvis_available() -> tuple[bool, str]:
         if not (root / "results" / "flow" / "0000" / "000").exists():
             return False, f"flyvis pretrained models missing under {root}"
         return True, ""
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return False, f"flyvis unavailable: {e}"
 
 

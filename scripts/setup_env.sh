@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
 # Create the `flybywire` conda env and install everything in a fixed order.
-# Safe to rerun: an existing env is reused.
-#
-#   1. conda env (python + pip + ffmpeg)
-#   2. PyTorch from the official CUDA wheel index (Blackwell needs CUDA >= 12.8)
-#   3. flyvis, then verify torch was not replaced
-#   4. gym-pybullet-drones from GitHub (falls back to --no-deps on conflicts)
-#   5. requirements.txt
-#   6. this package (editable)
-#   7. flyvis pretrained models into ./data/flyvis
-#   8. pip freeze > requirements.lock.txt
+# Safe to rerun: an existing env is reused. Blackwell GPUs need a torch built for CUDA >= 12.8.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

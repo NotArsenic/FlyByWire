@@ -240,7 +240,7 @@ def main(argv=None) -> int:
     ap.add_argument("overrides", nargs="*")
     args = ap.parse_args(argv)
     cfg = load_config(args.config, args.overrides)
-    cache = args.cache or str(Path(data_dir(cfg)) / "cache")
+    cache = args.cache or str(data_dir(cfg) / "cache")
     train_bc(cfg, cache, args.out, n_updates=args.updates, device=args.device, use_wandb=args.wandb)
     return 0
 

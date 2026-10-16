@@ -67,7 +67,6 @@ class FlyByWireModel(nn.Module):
         self.actor = Actor(self.groups[actor_group], n_actions, log_std_init)
         self.critic = Critic(conn.n)
 
-    # ------------------------------------------------------------------ lesions
     def lesion(self, names: Iterable[str]) -> None:
         """Silence the given cell-type groups (rates exactly 0) until :meth:`restore`."""
         self.core.keep.copy_(keep_mask(self.n, self.groups, names).to(self.core.keep.device))
@@ -75,7 +74,6 @@ class FlyByWireModel(nn.Module):
     def restore(self) -> None:
         self.core.keep.fill_(1.0)
 
-    # ------------------------------------------------------------------ steps
     def init_state(self, batch_size: int) -> torch.Tensor:
         return self.core.init_state(batch_size)
 

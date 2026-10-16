@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 """End-to-end PLUMBING smoke run. Not a result — never report its numbers.
 
-1. Render a synthetic textured scene drifting horizontally, driven by a known random-walk yaw
-   rate; 100 Hz frames -> BoxEye hexals; save 8 fake trajectories of 300 core steps
-   (75 decisions) to data/smoke/expert/.
-2. Build the T4/T5 cache with frozen flyvis (data/smoke/cache/).
-3. BC with the toy connectome for 200 updates; target action = yaw rate proportional to -rel_yaw.
-4. Assert all losses are finite and the total loss drops by >= 30%; print heading-decode R².
+Renders a synthetic textured scene drifting horizontally under a random-walk yaw rate (8 fake
+trajectories of 300 core steps = 75 decisions, saved to data/smoke/expert/), builds the T4/T5
+cache with frozen flyvis (data/smoke/cache/), then runs BC on the toy connectome for 200 updates
+with target action = yaw rate proportional to -rel_yaw. Asserts every loss is finite and the total
+loss drops by >= 30%; prints the heading-decode R².
 
 Uses data/flyvis/direction_map.json if it exists; otherwise measures a provisional map into
 data/smoke/direction_map.json (same routine as scripts/calibrate_t4t5_directions.py).
@@ -67,12 +66,11 @@ def make_trajectories(cfg, eye: BoxEye, out_dir: Path, seed: int = 0) -> list[Pa
 def main() -> int:
     t0 = time.time()
     base_cfg = load_config()
-    smoke_dir = Path(data_dir(base_cfg)) / "smoke"
+    smoke_dir = data_dir(base_cfg) / "smoke"
     traj_dir, cache_dir = smoke_dir / "expert", smoke_dir / "cache"
     device = "cuda" if torch.cuda.is_available() else "cpu"
     clocks = clocks_from_cfg(base_cfg)
 
-    # direction map: calibrated if available, else provisional
     dm_path = default_direction_map_path()
     eye = BoxEye(int(base_cfg.vision.boxeye.extent), int(base_cfg.vision.boxeye.kernel_size), device=device)
     if not dm_path.exists():
@@ -95,7 +93,7 @@ def main() -> int:
     print("[smoke] 2/4 build cache")
     build_cache_script.run(cfg, traj_dir, cache_dir, batch=N_TRAJ, device=device)
     print("[smoke] 3/4 BC (toy connectome)")
-    res = train_bc(cfg, cache_dir, Path(runs_dir(cfg)) / "smoke" / "bc", n_updates=N_UPDATES, device=device,
+    res = train_bc(cfg, cache_dir, runs_dir(cfg) / "smoke" / "bc", n_updates=N_UPDATES, device=device,
                    log_every=25)
     hist = res["history"]
 

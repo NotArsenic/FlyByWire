@@ -85,7 +85,6 @@ def erdos_renyi_like(M: np.ndarray, seed: int = 0) -> np.ndarray:
     n = M.shape[0]
     n_edges = int(M.sum())
     rng = np.random.default_rng(seed)
-    # sample n_edges distinct off-diagonal flat indices
     off = rng.choice(n * (n - 1), size=n_edges, replace=False)
     rows = off // (n - 1)
     cols = off % (n - 1)

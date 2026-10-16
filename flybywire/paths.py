@@ -14,16 +14,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from dotenv import dotenv_values
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def setup_flyvis_env() -> Path:
-    try:
-        from dotenv import dotenv_values
-
-        env_file = dotenv_values(REPO_ROOT / ".env")
-    except ImportError:
-        env_file = {}
+    env_file = dotenv_values(REPO_ROOT / ".env")
     raw = os.environ.get("FLYVIS_ROOT_DIR") or env_file.get("FLYVIS_ROOT_DIR") or "./data/flyvis"
     root = Path(raw).expanduser()
     if not root.is_absolute():

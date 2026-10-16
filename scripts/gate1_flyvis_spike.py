@@ -1,20 +1,19 @@
 #!/usr/bin/env python
 """Gate 1: can frozen flyvis be stepped frame by frame, with state carried, fast enough?
 
-1. Load ``vision.flyvis_model`` (flow/0000/000) on the GPU, eval mode, no grad.
-2. 200 frames of drifting texture at 160x160 -> BoxEye hexals.
-3. Equivalence: (a) one ``Network.forward`` call over the whole sequence vs (b) frame by frame
-   carrying state, for both stepper modes:
-     * ``public`` — ``Network.forward(x_t[:, None], dt, state=prev, as_states=True)[-1]``
-     * ``fast``   — parameters computed once, ``Network._next_state(params, state, x_t, dt)``
-   Report max |diff| and max |diff| / max |response|; > 1e-5 relative is a failure.
-4. Throughput at B = 1 and B = 12: 50 warm-up + 500 timed steps, ``torch.cuda.synchronize()``
-   around the timing; batched steps/s and env-steps/s.
-5. PASS iff state carries correctly AND B = 12 reaches >= 100 batched steps/s (with the mode the
-   stepper uses by default). Writes ``runs/gate1/report.json``.
+Equivalence: 200 frames of drifting texture (160x160 -> BoxEye hexals) go through the frozen
+stepper two ways, (a) one ``Network.forward`` call over the whole sequence and (b) frame by frame
+with carried state, in both stepper modes:
 
-If Gate 1 fails this script stops and reports; switching to the Farneback backend is the user's
-decision, not this script's.
+  * ``public`` — ``Network.forward(x_t[:, None], dt, state=prev, as_states=True)[-1]``
+  * ``fast``   — parameters computed once, ``Network._next_state(params, state, x_t, dt)``
+
+A max |diff| / max |response| above 1e-5 is a failure. Throughput is timed at B = 1 and B = 12
+(50 warm-up + 500 timed steps, ``torch.cuda.synchronize()`` around the timing).
+
+PASS iff state carries correctly AND B = 12 reaches >= 100 batched steps/s in the default
+(``fast``) mode. Writes ``runs/gate1/report.json``. If it fails the script stops and reports;
+switching to the Farneback backend is the user's decision.
 """
 
 from __future__ import annotations
@@ -23,7 +22,6 @@ import json
 import platform
 import sys
 import time
-from pathlib import Path
 
 import numpy as np
 import torch
@@ -120,7 +118,7 @@ def main(argv=None) -> int:
         "env": {"torch": torch.__version__, "cuda": torch.version.cuda, "gpu": torch.cuda.get_device_name(0),
                 "python": platform.python_version()},
     }
-    out_dir = Path(runs_dir(cfg)) / "gate1"
+    out_dir = runs_dir(cfg) / "gate1"
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "report.json").write_text(json.dumps(report, indent=2))
 

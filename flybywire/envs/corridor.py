@@ -68,5 +68,4 @@ class CorridorEnv(gym.Env):
         raise NotImplementedError("week 1: corridor env (spec 'Environment' / camera, renderer)")
 
     def close(self) -> None:
-        """Disconnect from PyBullet (STUB)."""
         raise NotImplementedError("week 1: corridor env")

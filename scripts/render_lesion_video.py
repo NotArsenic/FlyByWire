@@ -14,7 +14,6 @@ from __future__ import annotations
 
 
 def main(argv=None) -> int:
-    """Render the lesion video (STUB)."""
     raise NotImplementedError("needs the corridor env + trained policy (spec 'Dashboard and video')")
 
 

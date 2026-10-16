@@ -5,12 +5,10 @@ keeps neurons whose type matches the configured group patterns, sums synapse cou
 (pre, post) pair across neuropils, drops pairs below ``min_synapses`` and self-connections, and
 writes ``data/flywire/processed/cx_graph.npz`` (see :class:`~flybywire.connectome.celltypes.Connectome`).
 
-File and column names are configurable under ``connectome.flywire`` in the config. On a schema
-mismatch the loader prints the columns it actually found and exits.
+File and column names come from ``connectome.flywire`` in the config. On a schema mismatch the
+loader prints the columns it found and exits.
 
-Usage::
-
-    python -m flybywire.connectome.flywire [override=value ...]
+Usage: ``python -m flybywire.connectome.flywire [override=value ...]``
 """
 
 from __future__ import annotations
@@ -66,7 +64,6 @@ def load_flywire_cx(cfg, raw_dir: Path, verbose: bool = True) -> Connectome:
     cols = fw.columns
     patterns = {g: list(p) for g, p in cfg.connectome.groups.items()}
 
-    # --- annotations: id -> type
     ann = _read_table(raw_dir / fw.annotations_file, {"id": cols.id, "type": cols.type}, "annotation")
     ann = ann.dropna(subset=[cols.type]).drop_duplicates(subset=[cols.id])
     ann[cols.type] = ann[cols.type].astype(str)
@@ -90,7 +87,6 @@ def load_flywire_cx(cfg, raw_dir: Path, verbose: bool = True) -> Connectome:
     types = sel[cols.type].to_numpy(str)
     groups = {g: np.flatnonzero(sel["_group"].to_numpy() == g) for g in patterns}
 
-    # --- optional names / instances (for the anatomical ring layout)
     instances = types.copy()
     if fw.get("names_file"):
         names_path = raw_dir / fw.names_file
@@ -101,7 +97,7 @@ def load_flywire_cx(cfg, raw_dir: Path, verbose: bool = True) -> Connectome:
         elif verbose:
             print(f"(names table {names_path} not found; ring layout will fall back to 'tuning')")
 
-    # --- connections: sum over neuropils, threshold, drop self-loops
+    # sum over neuropils before thresholding, so min_synapses applies to the whole pair
     needed = {"pre": cols.pre, "post": cols.post, "syn_count": cols.syn_count}
     con = _read_table(raw_dir / fw.connections_file, needed, "connections")
     idset = pd.Index(ids)
@@ -141,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     from flybywire.config import data_dir, load_config
 
     cfg = load_config(overrides=argv if argv is not None else sys.argv[1:])
-    base = Path(data_dir(cfg)) / "flywire"
+    base = data_dir(cfg) / "flywire"
     conn = load_flywire_cx(cfg, base / "raw")
     out = base / "processed" / "cx_graph.npz"
     conn.save(out)

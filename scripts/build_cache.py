@@ -62,7 +62,7 @@ def main(argv=None) -> int:
     ap.add_argument("overrides", nargs="*")
     args = ap.parse_args(argv)
     cfg = load_config(overrides=args.overrides)
-    base = Path(data_dir(cfg))
+    base = data_dir(cfg)
     run(cfg, Path(args.traj_dir or base / "expert"), Path(args.out or base / "cache"), args.batch, args.device)
     return 0
 

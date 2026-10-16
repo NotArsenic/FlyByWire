@@ -43,7 +43,6 @@ class Clocks:
         if self.sensory_hz % self.control_hz:
             raise ValueError(f"sensory_hz={self.sensory_hz} not divisible by control_hz={self.control_hz}")
 
-    # --- ratios -----------------------------------------------------------------
     @property
     def physics_per_sensory(self) -> int:
         return self.physics_hz // self.sensory_hz
@@ -69,7 +68,6 @@ class Clocks:
     def dt_control(self) -> float:
         return 1.0 / self.control_hz
 
-    # --- alignment --------------------------------------------------------------
     def n_decisions(self, episode_seconds: float) -> int:
         k = episode_seconds * self.control_hz
         if abs(k - round(k)) > 1e-9:

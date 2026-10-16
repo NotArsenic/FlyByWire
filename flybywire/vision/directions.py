@@ -70,13 +70,12 @@ def measure_directions(
 ) -> dict:
     """Measure each T4/T5 subtype's preferred image direction with drifting square-wave gratings.
 
-    Gratings drift in ``n_directions`` directions evenly spaced from 0° (+x); with the default 12
-    (every 30°) this includes the four cardinal directions +x (0°), +y (90°, down), -x (180°) and
-    -y (270°). For each (period_px, temporal_hz) condition all directions run as one batch from the
-    grey steady state; the rectified activity ``relu(v)`` is averaged over central hexals
-    (normalised radius < ``central_radius``) and over time after ``discard_seconds``, then averaged
-    over conditions. Preferred direction = angle of the vector sum ``Σ_θ R(θ) e^{iθ}``;
-    ``dsi = |Σ_θ R(θ) e^{iθ}| / Σ_θ R(θ)``. (docs/DECISIONS.md D23.)
+    Gratings drift in ``n_directions`` evenly spaced directions from 0° (+x, with +y down); the
+    default 12 includes the four cardinal directions. For each (period_px, temporal_hz) condition
+    all directions run as one batch from the grey steady state; ``relu(v)`` is averaged over central
+    hexals (normalised radius < ``central_radius``) and over time after ``discard_seconds``, then
+    over conditions. Preferred direction is the angle of ``Σ_θ R(θ) e^{iθ}`` and
+    ``dsi = |Σ_θ R(θ) e^{iθ}| / Σ_θ R(θ)`` (docs/DECISIONS.md D23).
     """
     import torch
 

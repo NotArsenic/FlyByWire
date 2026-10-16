@@ -14,7 +14,6 @@ from __future__ import annotations
 
 
 def main(argv=None) -> int:
-    """Run the env benchmark (STUB)."""
     raise NotImplementedError("week 1: needs flybywire.envs.corridor / vec (spec 'PPO / Rollouts')")
 
 

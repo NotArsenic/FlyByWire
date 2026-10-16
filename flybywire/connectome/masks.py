@@ -7,7 +7,6 @@ All conditions share the same N, neuron order and cell-type index sets; only the
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from flybywire.connectome.celltypes import Connectome
 from flybywire.connectome.rewire import directed_rewire, erdos_renyi_like
@@ -46,7 +45,7 @@ def load_base_connectome(cfg) -> Connectome:
     if src == "flywire":
         from flybywire.config import data_dir
 
-        path = Path(data_dir(cfg)) / "flywire" / "processed" / "cx_graph.npz"
+        path = data_dir(cfg) / "flywire" / "processed" / "cx_graph.npz"
         if not path.exists():
             raise FileNotFoundError(
                 f"{path} not found. Download the FlyWire tables into data/flywire/raw/ "
@@ -61,10 +60,10 @@ def load_base_connectome(cfg) -> Connectome:
 
 
 def build_connectome(cfg, seed: int | None = None) -> Connectome:
-    """Base graph for the configured source with the configured mask type applied.
+    """Base graph with the configured mask type applied.
 
     ``seed`` (default ``cfg.seed``) seeds the rewire / ER null model, so each training seed gets
-    its own null-graph instance.
+    its own null graph.
     """
     conn = load_base_connectome(cfg)
     seed = int(cfg.seed if seed is None else seed)

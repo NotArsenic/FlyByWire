@@ -15,7 +15,6 @@ from __future__ import annotations
 
 
 def main(argv=None) -> int:
-    """Run Gate 3 (STUB)."""
     raise NotImplementedError("needs FlyWire connectome + trained BC model (spec 'Gates')")
 
 

@@ -42,7 +42,7 @@ def run_jobs(jobs: list[dict], max_parallel: int, poll_s: float = 2.0) -> list[d
         while pending and len(running) < max_parallel:
             job = pending.pop(0)
             job["out"].mkdir(parents=True, exist_ok=True)
-            log = open(job["out"] / "train.log", "w")  # noqa: SIM115
+            log = open(job["out"] / "train.log", "w")
             print(f"[sweep] start {job['condition']} seed {job['seed']}")
             running.append((job, subprocess.Popen(job["cmd"], stdout=log, stderr=subprocess.STDOUT), log))
         still = []
@@ -83,8 +83,8 @@ def main(argv=None) -> int:
     ap.add_argument("overrides", nargs="*")
     args = ap.parse_args(argv)
     cfg = load_config(args.config, args.overrides)
-    cache = args.cache or str(Path(data_dir(cfg)) / "cache")
-    out_root = Path(args.out) if args.out else Path(runs_dir(cfg)) / "sweep"
+    cache = args.cache or str(data_dir(cfg) / "cache")
+    out_root = Path(args.out) if args.out else runs_dir(cfg) / "sweep"
     jobs = build_jobs(cfg, cache, out_root, list(args.overrides), args.updates)
     if args.dry_run:
         for j in jobs:

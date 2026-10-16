@@ -283,3 +283,17 @@ The spec says: sum synapse counts per (pre, post) pair across neuropils, then dr
 before our sum. The README therefore recommends an unthresholded variant of the connections table
 when Codex offers one. The loader cannot detect which variant it was given; whoever downloads the
 data should note which file was used here.
+
+## 2026-10-17 — D26. Comment and docstring cleanup; `paper/` removed
+
+No-behavior-change pass over `flybywire/`, `tests/` and `scripts/` to match the code-style section in
+AGENTS.md: dropped banner comments, comments that restated the next line, dead `noqa`s and
+`(STUB)` docstrings that repeated the function name. Two small code simplifications, both
+behavior-neutral: `python-dotenv` is a hard requirement, so `config.py` and `paths.py` import it at
+module level instead of behind an `ImportError` guard, and redundant `Path(data_dir(cfg))` /
+`Path(runs_dir(cfg))` wraps are gone (both already return `Path`). Module docstrings that argparse
+prints as `--help` text (`build_cache`, `calibrate_t4t5_directions`, `check_env`, `train.sweep`)
+were left as they were.
+
+This is a project, not a paper, so `paper/` (writeup skeleton and `references.md`) was deleted. The
+citations that only lived in `references.md` are now in the README.
