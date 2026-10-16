@@ -133,7 +133,10 @@ def train_bc(
     log_every: int = 25,
     use_wandb: bool = False,
     verbose: bool = True,
+    conn=None,
+    lptc=None,
 ) -> dict:
+    """Train BC; ``conn`` / ``lptc`` override the config-built connectome / LPTC (tests, smoke)."""
     from flybywire.core.model import build_model
 
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -151,7 +154,7 @@ def train_bc(
     n_val = int(round(val_fraction * len(data))) if len(data) >= 10 else 0
     val_idx, train_idx = order[:n_val].tolist(), order[n_val:].tolist()
 
-    model = build_model(cfg, verbose=verbose).to(device)
+    model = build_model(cfg, conn=conn, lptc=lptc, verbose=verbose).to(device)
     params = [p for n, p in model.named_parameters() if not n.startswith("critic.") and n != "actor.log_std"]
     opt = torch.optim.Adam(params, lr=float(cfg.bc.lr))
     bcfg = cfg.bc

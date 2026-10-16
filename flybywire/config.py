@@ -138,8 +138,14 @@ def validate_config(cfg: DictConfig) -> Clocks:
 
 def config_hash(cfg: DictConfig, keys: Sequence[str] | None = None) -> str:
     """Short stable hash of (a subset of) the config, for cache manifests and metadata."""
-    sub = cfg if keys is None else {k: OmegaConf.select(cfg, k) for k in keys}
-    blob = OmegaConf.to_yaml(OmegaConf.create(OmegaConf.to_container(sub, resolve=True)), sort_keys=True)
+    if keys is None:
+        sub = OmegaConf.to_container(cfg, resolve=True)
+    else:
+        sub = {}
+        for k in keys:
+            v = OmegaConf.select(cfg, k)
+            sub[k] = OmegaConf.to_container(v, resolve=True) if OmegaConf.is_config(v) else v
+    blob = OmegaConf.to_yaml(OmegaConf.create(sub), sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()[:12]
 
 
