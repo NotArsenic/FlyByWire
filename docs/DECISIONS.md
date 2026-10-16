@@ -92,3 +92,29 @@ torch 2.11. gym-pybullet-drones declares `torch = "^2.13"`. The spec allows "a n
 one is the current stable", so `setup_env.sh` uses `https://download.pytorch.org/whl/cu130`
 (override with `TORCH_INDEX=...`). The RTX 5060 Ti (sm_120) needs CUDA ≥ 12.8; cu130 satisfies this.
 `check_env.py` verifies `sm_120` is in `torch.cuda.get_arch_list()`.
+
+## 2026-10-16 — D10. Installation outcome (Phase 2)
+
+- `scripts/setup_env.sh` ran cleanly end to end. Installed: Python 3.12.15, torch 2.14.1+cu130
+  (CUDA 13.0, cuDNN 9.24), flyvis 1.2.0, gymnasium 1.4.0, pybullet 3.2.7, gym-pybullet-drones 2.2.0
+  (commit `01563120`), numpy 2.5.2, numba 0.68.0. `pip check`: no broken requirements.
+- `pip install flyvis` did **not** replace torch (verified by the script).
+- gym-pybullet-drones: a `pip install --dry-run --report` showed that installing it *with*
+  dependencies would replace no already-installed package, so it was installed normally
+  (not `--no-deps`). This pulls in stable-baselines3 2.9.0 as a transitive dependency; the project
+  does not use SB3 (PPO is written by hand, per spec).
+- pybullet 3.2.7 has no prebuilt cp312 wheel; pip built it from source (~3 min, needs a C++
+  toolchain, which the host had). EGL hardware rendering works: 1.7 ms/frame vs 3.9 ms/frame for
+  TinyRenderer at 160×160 on the RTX 5060 Ti.
+- `flyvis download-pretrained --skip_large_files` downloaded ~3.5 MB of zips; `du -sh data/flyvis`
+  = **10 MB** (50 `flow/0000/*` models). The models are small because flyvis has only a few hundred
+  free parameters per network.
+
+## 2026-10-16 — D11. flyvis resolves `FLYVIS_ROOT_DIR` relative to the CWD
+
+`flyvis/__init__.py` calls `dotenv.load_dotenv(find_dotenv(usecwd=True))` and then
+`Path(os.getenv("FLYVIS_ROOT_DIR")).absolute()` — i.e. `./data/flyvis` from `.env` is resolved
+against the *current working directory*, and the directory is silently `mkdir`ed if missing. Running
+from a subdirectory would therefore look for models in the wrong place. `flybywire.paths.setup_flyvis_env()`
+sets `FLYVIS_ROOT_DIR` to an absolute path (repo-relative) **before** flyvis is imported; all
+flybywire code imports flyvis only through `flybywire.vision.flyvis_stepper`, which calls it first.

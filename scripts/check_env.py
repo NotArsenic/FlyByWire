@@ -221,10 +221,10 @@ def check_pybullet() -> None:
         tiny_ms = _time_render(p, p.ER_TINY_RENDERER)
         egl_ms = None
         try:
-            import pkgutil
+            import importlib.util
 
-            egl = pkgutil.get_loader("eglRenderer")
-            plugin = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin") if egl else -1
+            egl = importlib.util.find_spec("eglRenderer")
+            plugin = p.loadPlugin(egl.origin, "_eglRendererPlugin") if egl else -1
             if plugin >= 0:
                 egl_ms = _time_render(p, p.ER_BULLET_HARDWARE_OPENGL)
                 p.unloadPlugin(plugin)
