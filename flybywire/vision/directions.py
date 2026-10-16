@@ -62,58 +62,69 @@ def measure_directions(
     cell_types=DEFAULT_CELL_TYPES,
     frame_size: int = 160,
     frame_hz: float = 100.0,
-    periods_px=(24.0, 40.0),
-    temporal_hz: float = 2.0,
+    n_directions: int = 12,
+    conditions=((40.0, 2.0), (40.0, 4.0), (64.0, 2.0), (64.0, 4.0)),
     seconds: float = 1.5,
     discard_seconds: float = 0.5,
+    central_radius: float = 0.6,
 ) -> dict:
     """Measure each T4/T5 subtype's preferred image direction with drifting square-wave gratings.
 
-    For every direction in {+x, -x, +y, -y} and every grating period, the stepper is reset to the
-    grey steady state, the grating is presented for ``seconds`` and the rectified activity
-    ``relu(v)`` is averaged over hexals and over time after ``discard_seconds``. The preferred
-    vector is ``(R(+x) - R(-x), R(+y) - R(-y))`` (averaged over periods), normalised.
-    ``dsi = |vector| / (sum of the four responses)``.
+    Gratings drift in ``n_directions`` directions evenly spaced from 0° (+x); with the default 12
+    (every 30°) this includes the four cardinal directions +x (0°), +y (90°, down), -x (180°) and
+    -y (270°). For each (period_px, temporal_hz) condition all directions run as one batch from the
+    grey steady state; the rectified activity ``relu(v)`` is averaged over central hexals
+    (normalised radius < ``central_radius``) and over time after ``discard_seconds``, then averaged
+    over conditions. Preferred direction = angle of the vector sum ``Σ_θ R(θ) e^{iθ}``;
+    ``dsi = |Σ_θ R(θ) e^{iθ}| / Σ_θ R(θ)``. (docs/DECISIONS.md D23.)
     """
     import torch
 
+    from flybywire.vision.flowfields import hexal_normalized_coords
     from flybywire.vision.stimuli import grating_sequence
 
     n_frames = int(round(seconds * frame_hz))
     n_skip = int(round(discard_seconds * frame_hz))
-    resp = {d: np.zeros(len(cell_types)) for d in ("+x", "-x", "+y", "-y")}
-    for d in resp:
-        for period in periods_px:
-            frames = grating_sequence(frame_size, period, temporal_hz, n_frames, frame_hz, d)
-            hexals = eye(torch.from_numpy(frames).to(eye.device))  # (T, 721)
-            out = stepper.run_sequence(hexals[None])  # (1, T, 8, 721)
-            r = torch.relu(out[0, n_skip:]).mean(dim=(0, 2)).cpu().numpy()  # (8,)
-            resp[d] += r / len(periods_px)
+    angles = np.arange(n_directions) * 2 * np.pi / n_directions
+    xy = hexal_normalized_coords(eye.extent, eye.kernel_size)
+    central = torch.as_tensor(np.linalg.norm(xy, axis=1) < central_radius, device=stepper.device)
+    R = np.zeros((n_directions, len(cell_types)))
+    for period, tf in conditions:
+        frames = np.stack([grating_sequence(frame_size, period, tf, n_frames, frame_hz, float(a)) for a in angles])
+        x = torch.from_numpy(frames).to(eye.device)  # (D, T, H, W)
+        hexals = torch.stack([eye(x[:, t]) for t in range(n_frames)], dim=1)  # (D, T, 721)
+        out = stepper.run_sequence(hexals)  # (D, T, 8, 721)
+        R += torch.relu(out[:, n_skip:][..., central]).mean(dim=(1, 3)).cpu().numpy() / len(conditions)
     stepper.reset(1)
-    grey = torch.relu(stepper.state[:, stepper._out_index]).mean(dim=(0, 2)).cpu().numpy()
+    grey = torch.relu(stepper.state[:, stepper._out_index][..., central]).mean(dim=(0, 2)).cpu().numpy()
+    vec = (R * np.exp(1j * angles)[:, None]).sum(axis=0)  # (8,) complex
+    cardinal = {"+x": 0.0, "+y": 90.0, "-x": 180.0, "-y": 270.0}
+    deg = np.round(np.degrees(angles), 6)
     subtypes = {}
     for i, t in enumerate(cell_types):
-        vec = np.array([resp["+x"][i] - resp["-x"][i], resp["+y"][i] - resp["-y"][i]])
-        total = sum(resp[d][i] for d in resp)
-        norm = float(np.linalg.norm(vec))
+        norm = float(np.abs(vec[i]))
+        d = vec[i] / norm if norm > 0 else 0.0
         subtypes[t] = {
-            "direction": (vec / norm).tolist() if norm > 0 else [0.0, 0.0],
-            "angle_deg": float(np.degrees(np.arctan2(vec[1], vec[0]))),
-            "dsi": float(norm / total) if total > 0 else 0.0,
-            "responses": {d: float(resp[d][i]) for d in resp},
+            "direction": [float(np.real(d)), float(np.imag(d))],
+            "angle_deg": float(np.degrees(np.angle(vec[i]))),
+            "dsi": float(norm / R[:, i].sum()) if R[:, i].sum() > 0 else 0.0,
+            "responses": {k: float(R[np.flatnonzero(deg == a)[0], i]) for k, a in cardinal.items() if a in deg},
+            "tuning_curve": {f"{a:g}": float(r) for a, r in zip(deg, R[:, i], strict=True)},
         }
     return {
         "model": getattr(stepper, "model_id", None),
         "dt": getattr(stepper, "dt", None),
-        "convention": "image coordinates: x right, y down; angle_deg = atan2(dy, dx)",
+        "convention": "image coordinates: x right, y down; angle_deg = atan2(dy, dx); +y (90°) is downward",
         "stimulus": {
-            "type": "square-wave grating",
-            "periods_px": list(periods_px),
-            "temporal_hz": temporal_hz,
+            "type": "square-wave grating, full contrast",
+            "n_directions": n_directions,
+            "conditions_period_px_temporal_hz": [list(c) for c in conditions],
             "seconds": seconds,
             "discard_seconds": discard_seconds,
             "frame_size": frame_size,
-            "response": "mean relu(activity) over hexals and time",
+            "central_radius": central_radius,
+            "response": "mean relu(activity) over central hexals and time, averaged over conditions",
+            "estimate": "vector sum over directions",
         },
         "subtypes": subtypes,
         "baseline": {t: float(grey[i]) for i, t in enumerate(cell_types)},

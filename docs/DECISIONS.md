@@ -221,3 +221,51 @@ Verified in the installed `gymnasium/vector/async_vector_env.py` (1.4.0).
 `flybywire/paths.py` (safe flyvis import, D11/D12) and `flybywire/vision/stimuli.py` (drifting
 panoramas and gratings shared by the smoke run, Gate 1 and calibration). `measure_directions()`
 lives in `flybywire/vision/directions.py` so the calibration script and the smoke run share it.
+
+---
+
+## Gate 1 and calibration (Phase 5)
+
+## 2026-10-16 — D23. Direction calibration uses 12 directions, not 4 **[deviation]**
+
+The spec's protocol (gratings moving +x, −x, +y, −y; preferred vector `(R+x − R−x, R+y − R−y)`) was
+implemented first. With 24/40 px periods at 2 Hz it gave near-zero direction selectivity for T4d
+(DSI 0.03) and T5b (0.035), so their "preferred directions" were noise. A wider probe (12
+directions × 6 period/TF conditions, central hexals) showed: T5b is well tuned only at larger
+periods / higher TF; T4d is weakly tuned under every condition. The calibration now uses 12
+directions every 30° (a superset that still contains ±x, ±y, whose responses are still recorded),
+conditions (40, 64 px) × (2, 4 Hz), hexals with normalised radius < 0.6 (avoids border effects),
+and a vector-sum estimate. `direction_map.json` stores the full tuning curves.
+
+Result for `flow/0000/000` (image coords, x right, y down):
+
+| subtype | angle | DSI |
+|---|---|---|
+| T4a | −177.4° | 0.41 |
+| T4b | +8.2° | 0.52 |
+| T4c | −61.3° | 0.51 |
+| T4d | −76.4° | 0.23 |
+| T5a | −177.0° | 0.48 |
+| T5b | +21.6° | 0.33 |
+| T5c | −117.6° | 0.77 |
+| T5d | +120.3° | 0.54 |
+
+Note: the a/b pairs are horizontal and opposite. The T5 c/d pair is opposite and vertical at ±118°
+(not ±90°; consistent with BoxEye's skewed hex lattice: `y = d(u + v/2)`, `x = d·v`). **T4d is
+weakly selective and points upward next to T4c rather than opposite it** — a property of this
+pretrained model under these stimuli, not corrected here. In `gains`/`full` LPTC modes the
+per-(channel, subtype) gains can down-weight it.
+
+## 2026-10-16 — D24. Gate 1 result: PASS
+
+`runs/gate1/report.json`: frame-by-frame stepping with carried state matches a single
+full-sequence `Network.forward` call to max |Δ| = 4.8e-7 (relative 2.7e-7; scale 1.79) in both
+`fast` and `public` modes — the non-zero residual is consistent with non-deterministic
+`scatter_add` accumulation order on the GPU. Throughput (`fast`): B = 1 → 5,640 steps/s;
+B = 12 → 634 batched steps/s = 7,605 env-steps/s (`public`: 2,655 / 568). Criterion (≥ 100
+batched steps/s at B = 12) met with margin; `fast` is the default stepper mode.
+
+Observation for later: flyvis's BoxEye is now the slower stage at B = 12 (419 calls/s, ~2.4 ms):
+it resizes 160² → 391² and convolves samples one at a time. Replacing it with an equivalent batched
+`avg_pool2d` is a cheap optimisation if PPO rollouts become BoxEye-bound (must be checked for
+exact equivalence).

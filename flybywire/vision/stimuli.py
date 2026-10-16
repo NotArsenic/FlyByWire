@@ -48,9 +48,17 @@ def view_from_panorama(pano: np.ndarray, yaw: float, size: int = 160, fov_deg: f
     return rows[:, c0] * (1 - frac) + rows[:, c1] * frac
 
 
-def square_grating(size: int, period_px: float, shift_px: float, direction: str, contrast: float = 1.0) -> np.ndarray:
-    """Square-wave grating whose stripes move by ``shift_px`` along ``direction`` (+x, -x, +y, -y)."""
-    dx, dy = DIRECTIONS[direction]
+def square_grating(
+    size: int, period_px: float, shift_px: float, direction: str | float, contrast: float = 1.0
+) -> np.ndarray:
+    """Square-wave grating whose stripes move by ``shift_px`` along ``direction``.
+
+    ``direction`` is one of +x, -x, +y, -y or an angle in radians (``atan2(dy, dx)``, image coords).
+    """
+    if isinstance(direction, str):
+        dx, dy = DIRECTIONS[direction]
+    else:
+        dx, dy = float(np.cos(direction)), float(np.sin(direction))
     yy, xx = np.mgrid[0:size, 0:size].astype(np.float32)
     pos = xx * dx + yy * dy  # coordinate along the motion axis
     phase = 2 * np.pi * (pos - shift_px) / period_px
@@ -58,7 +66,7 @@ def square_grating(size: int, period_px: float, shift_px: float, direction: str,
 
 
 def grating_sequence(
-    size: int, period_px: float, temporal_hz: float, n_frames: int, frame_hz: float, direction: str
+    size: int, period_px: float, temporal_hz: float, n_frames: int, frame_hz: float, direction: str | float
 ) -> np.ndarray:
     """(n_frames, size, size) drifting grating."""
     speed = period_px * temporal_hz / frame_hz  # px per frame
