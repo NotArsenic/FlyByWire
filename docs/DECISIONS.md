@@ -108,7 +108,8 @@ one is the current stable", so `setup_env.sh` uses `https://download.pytorch.org
   TinyRenderer at 160×160 on the RTX 5060 Ti.
 - `flyvis download-pretrained --skip_large_files` downloaded ~3.5 MB of zips; `du -sh data/flyvis`
   = **10 MB** (50 `flow/0000/*` models). The models are small because flyvis has only a few hundred
-  free parameters per network.
+  free parameters per network. On the first network initialisation flyvis additionally builds a
+  101 MB connectome cache in `data/flyvis/connectome/`, so the steady-state footprint is 111 MB.
 
 ## 2026-10-16 — D11. flyvis resolves `FLYVIS_ROOT_DIR` relative to the CWD
 
@@ -117,7 +118,7 @@ one is the current stable", so `setup_env.sh` uses `https://download.pytorch.org
 against the *current working directory*, and the directory is silently `mkdir`ed if missing. Running
 from a subdirectory would therefore look for models in the wrong place. `flybywire.paths.setup_flyvis_env()`
 sets `FLYVIS_ROOT_DIR` to an absolute path (repo-relative) **before** flyvis is imported; all
-flybywire code imports flyvis only through `flybywire.vision.flyvis_stepper`, which calls it first.
+flybywire code imports flyvis only through `flybywire.paths.import_flyvis()`, which calls it first.
 
 ---
 
@@ -269,3 +270,16 @@ Observation for later: flyvis's BoxEye is now the slower stage at B = 12 (419 ca
 it resizes 160² → 391² and convolves samples one at a time. Replacing it with an equivalent batched
 `avg_pool2d` is a cheap optimisation if PPO rollouts become BoxEye-bound (must be checked for
 exact equivalence).
+
+---
+
+## Documentation (Phase 6)
+
+## 2026-10-16 — D25. FlyWire thresholding order
+
+The spec says: sum synapse counts per (pre, post) pair across neuropils, then drop pairs below
+`min_synapses` (5). If the downloaded connections table is already thresholded per
+(pre, post, neuropil) row, pairs whose synapses are spread over several neuropils are undercounted
+before our sum. The README therefore recommends an unthresholded variant of the connections table
+when Codex offers one. The loader cannot detect which variant it was given; whoever downloads the
+data should note which file was used here.

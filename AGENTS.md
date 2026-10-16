@@ -7,8 +7,15 @@ Read this before changing code. The full spec lives in the README and `docs/DECI
 
 - **fp32 only.** No AMP / autocast / bf16 / `torch.compile`. On-disk caches may be fp16 but are upcast
   on load. (Ring-attractor dynamics are marginally stable; low precision makes fake drift.)
-- **BC never runs flyvis.** BC reads only the T4/T5 cache in `data/cache/`.
+- **BC never runs flyvis.** BC reads only the T4/T5 cache in `data/cache/` (a test enforces that
+  `flybywire.train.bc` does not import flyvis).
+- **Import flyvis only via `flybywire.paths.import_flyvis()`** and run flyvis calls inside
+  `with torch.device(dev):`. flyvis resolves `FLYVIS_ROOT_DIR` against the CWD and sets torch's
+  global default device to CUDA on import (DECISIONS D11/D12).
+- The frozen flyvis stepper (`vision/flyvis_stepper.py`) is the gradient boundary; its default
+  `fast` mode uses private `Network._next_state` — rerun `make gate1` after any flyvis upgrade.
 - Do not guess flyvis / gym-pybullet-drones / gymnasium APIs: read the installed source.
+- Environment: Python 3.12, torch cu130 (Blackwell `sm_120`), conda env `flybywire`.
 - Never use the `toy` connectome for reported results (it logs a loud warning).
 - No novelty claims ("first", "novel", "state-of-the-art") anywhere.
 - No `sudo`; do not edit files outside the repo. Ask before jobs longer than ~10 min.
@@ -30,7 +37,9 @@ tensors. Group index sets (ER, EPG, PEN, PEG, D7, PFL3, ...) come from `configs/
 Defined once in `flybywire/clocks.py` (`Clocks`). Core steps are indexed `t = 0..T-1`; decision `k`
 is read out **after** core step `t = 4k + 3` (`Clocks.decision_core_steps`), i.e. after the last
 sensory tick of its window, and the action is held for the next 4 core steps / 8 physics steps.
-Data collection, BC and PPO must all use `Clocks` — never re-derive the alignment.
+Data collection, BC and PPO must all use `Clocks` — never re-derive the alignment. Episodes have
+`T = 4K` frames; `reset()` runs a 4-frame hover pre-roll and the env returns 4 frames per step.
+PPO uses gymnasium `AutoresetMode.SAME_STEP` (DECISIONS D20).
 
 ## Invariants (each has a test in `tests/`)
 
