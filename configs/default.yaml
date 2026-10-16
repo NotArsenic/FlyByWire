@@ -10,6 +10,7 @@ clocks:
 env:
   frame_size: 160
   camera_fov_deg: 110
+  camera_tilt_deg: 10      # initial; downward FPV tilt, also used by the LPTC flow templates
   episode_seconds: 10
   corridor: {length_m: 30, width_m: 3.0, height_m: 2.5}
   n_obstacles: 8
@@ -24,6 +25,7 @@ vision:
 lptc:
   channels: [yaw, pitch, roll, forward, lateral, vertical, loom_left, loom_right]
   mode: gains              # frozen | gains | full
+  direction_map: null      # path; null -> $FLYVIS_ROOT_DIR/direction_map.json (make calibrate)
 connectome:
   source: toy              # toy | flywire
   mask_type: real          # real | rewire | er
@@ -36,6 +38,19 @@ connectome:
     PEG:  ["PEG*"]
     D7:   ["Delta7*"]
     PFL3: ["PFL3*"]
+  flywire:                 # manual Codex download into data/flywire/raw/; VERIFY names against the files
+    snapshot: 783
+    connections_file: connections.csv.gz
+    annotations_file: consolidated_cell_types.csv.gz
+    names_file: names.csv.gz # optional (instance names for the anatomical ring layout); "" to skip
+    columns:
+      pre: pre_root_id
+      post: post_root_id
+      syn_count: syn_count
+      id: root_id
+      type: primary_type
+      name_id: root_id
+      name: name
   input_group: ER
   heading_group: EPG
   actor_group: PFL3

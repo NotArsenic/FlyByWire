@@ -178,8 +178,9 @@ def check_flyvis() -> None:
         pass
     os.environ.setdefault("FLYVIS_ROOT_DIR", str(REPO / "data" / "flyvis"))
     try:
-        import flyvis  # noqa: F401
         from importlib.metadata import version
+
+        import flyvis  # noqa: F401
 
         row("flyvis import", "PASS", f"flyvis {version('flyvis')}")
     except Exception as e:  # noqa: BLE001
@@ -190,7 +191,8 @@ def check_flyvis() -> None:
         root = (REPO / root).resolve()
     model_dir = root / "results" / "flow" / "0000" / "000"
     if model_dir.exists() and any(model_dir.rglob("*")):
-        row("flyvis pretrained", "PASS", f"found {model_dir.relative_to(REPO) if model_dir.is_relative_to(REPO) else model_dir}")
+        shown = model_dir.relative_to(REPO) if model_dir.is_relative_to(REPO) else model_dir
+        row("flyvis pretrained", "PASS", f"found {shown}")
     else:
         row("flyvis pretrained", "FAIL", f"missing {model_dir}; run `make env` step 7 (flyvis download-pretrained)")
 
@@ -250,8 +252,9 @@ def check_gymnasium() -> None:
         return
     row("gymnasium", "PASS", f"gymnasium {gymnasium.__version__}")
     try:
-        import gym_pybullet_drones  # noqa: F401
         from importlib.metadata import version
+
+        import gym_pybullet_drones  # noqa: F401
 
         row("gym-pybullet-drones", "PASS", f"gym-pybullet-drones {version('gym-pybullet-drones')}")
     except Exception as e:  # noqa: BLE001

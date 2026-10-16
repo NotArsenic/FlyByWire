@@ -17,7 +17,7 @@ dependencies = []
 include = ["flybywire*"]
 
 [tool.ruff]
-line-length = 110
+line-length = 120
 target-version = "py312"
 extend-exclude = ["data", "runs", "graphify-out"]
 
