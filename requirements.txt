@@ -1,0 +1,24 @@
+# Runtime + dev dependencies (lower bounds only).
+# NOTE: torch is installed separately from the official CUDA wheel index
+# (https://download.pytorch.org/whl/cu128) by scripts/setup_env.sh.
+# flyvis and gym-pybullet-drones are also installed by setup_env.sh.
+numpy
+scipy
+pandas
+pyarrow
+networkx>=3.0
+scikit-learn
+omegaconf
+python-dotenv
+opencv-python-headless
+matplotlib
+plotly
+streamlit
+imageio[ffmpeg]
+tqdm
+rich
+wandb
+pytest
+ruff
+pybullet
+gymnasium

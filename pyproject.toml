@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flybywire"
+version = "0.1.0"
+description = "Quadcopter corridor flight driven by a frozen flyvis optic lobe and a FlyWire-masked central-complex rate network."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10,<3.13"
+# Runtime deps live in requirements.txt; torch / flyvis / gym-pybullet-drones are
+# installed by scripts/setup_env.sh in a fixed order.
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["flybywire*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["data", "runs", "graphify-out"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E741"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "gpu: needs a CUDA GPU (skipped when unavailable)",
+    "flyvis: needs flyvis and its pretrained models (skipped when unavailable)",
+]

@@ -1,0 +1,22 @@
+# data: everything except the README
+data/*
+!data/README.md
+runs/*
+!runs/.gitkeep
+wandb/
+.env
+*.npy
+*.npz
+*.mp4
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# graphify (regenerate with `graphify update .`)
+graphify-out/

@@ -1,0 +1,10 @@
+# Conda environment for Fly-By-Wire.
+# PyTorch, flyvis and gym-pybullet-drones are installed by scripts/setup_env.sh
+# (in a fixed order) rather than here, so that torch comes from the CUDA 12.8+ index.
+name: flybywire
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - ffmpeg

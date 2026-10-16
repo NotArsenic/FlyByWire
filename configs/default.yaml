@@ -1,0 +1,86 @@
+# Single source of truth for Fly-By-Wire. Values marked "initial" are tunable.
+seed: 0
+paths:
+  data_dir: ${oc.env:FBW_DATA_DIR,./data}
+  runs_dir: ./runs
+clocks:
+  physics_hz: 200
+  sensory_hz: 100          # render + flyvis + core; flyvis dt = 1 / sensory_hz
+  control_hz: 25           # actor readout; action held between readouts
+env:
+  frame_size: 160
+  camera_fov_deg: 110
+  episode_seconds: 10
+  corridor: {length_m: 30, width_m: 3.0, height_m: 2.5}
+  n_obstacles: 8
+  wall_texture: none       # none | checker | noise
+  renderer: auto           # auto | egl | tiny
+vision:
+  backend: flyvis          # flyvis | farneback
+  flyvis_model: flow/0000/000
+  boxeye: {extent: 15, kernel_size: 13}
+  cell_types: [T4a, T4b, T4c, T4d, T5a, T5b, T5c, T5d]
+  steady_state_seconds: 0.5
+lptc:
+  channels: [yaw, pitch, roll, forward, lateral, vertical, loom_left, loom_right]
+  mode: gains              # frozen | gains | full
+connectome:
+  source: toy              # toy | flywire
+  mask_type: real          # real | rewire | er
+  min_synapses: 5
+  rewire_swaps_per_edge: 10
+  groups:                  # hemibrain-style patterns; VERIFY against the annotation table
+    ER:   ["ER*"]
+    EPG:  ["EPG*"]
+    PEN:  ["PEN*"]
+    PEG:  ["PEG*"]
+    D7:   ["Delta7*"]
+    PFL3: ["PFL3*"]
+  input_group: ER
+  heading_group: EPG
+  actor_group: PFL3
+  lesion_groups: [EPG, PEN, D7]
+core:
+  phi: softplus            # softplus | relu
+  alpha_init: 0.2
+  w_init_gain: 0.5
+  input_dependent_alpha: false
+heads:
+  log_std_init: -1.5
+  ring_wedges: 16
+  ring_layout: auto        # anatomical | tuning | auto
+action:
+  space: body_vel_yawrate  # [v_forward, v_lateral, v_vertical, yaw_rate]
+  limits:                  # initial values, tune in week 1
+    v_forward: [0.0, 2.0]
+    v_lateral: [-1.0, 1.0]
+    v_vertical: [-0.5, 0.5]
+    yaw_rate: [-1.5, 1.5]
+reward: {progress: 1.0, heading: 0.3, collision: -10.0, attitude: -0.05, smoothness: -0.01}
+bc:
+  n_trajectories: 300
+  batch_episodes: 32
+  tbptt_core_steps: 128
+  lr: 1.0e-3
+  grad_clip: 1.0
+  aux_weight: 0.5
+  epochs: 50
+ppo:
+  n_envs: 12
+  rollout_decisions: 128
+  epochs: 4
+  clip: 0.2
+  gamma: 0.99
+  gae_lambda: 0.95
+  lr_actor: 3.0e-5
+  lr_critic: 3.0e-4
+  critic_warmup_iters: 10
+  kl_anchor_beta: 0.1
+  kl_anchor_decay_updates: 50
+  aux_weight: 0.5
+sweep:
+  conditions: [real, rewire]
+  seeds: [0, 1, 2]
+  max_parallel: 6
+logging:
+  wandb_mode: offline
