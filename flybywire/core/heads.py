@@ -3,6 +3,8 @@
 * :class:`InputProjection`: (B, 8) LPTC channels -> (B, N); nonzero only on ER neurons (inv. 3).
 * :class:`HeadingDecoder`: Linear(|EPG| -> 2), (sin, cos) of heading relative to episode start.
   Auxiliary only; never feeds the actor. Reads only EPG rates (inv. 4).
+* :class:`AnatomicalHeadingDecoder`: the same readout with fixed weights, the (sin, cos) of each
+  EPG neuron's angle around the ellipsoid body; only a scalar gain and the bias are learned.
 * :class:`Actor`: Linear(|PFL3| -> 4) + tanh mean, state-independent ``log_std`` (init -1.5).
   Linear on purpose: "steering is a linear readout of PFL3". Reads only PFL3 rates (inv. 4).
 * :class:`Critic`: small MLP on ``r.detach()``; never backpropagates into the core (inv. 4).
@@ -40,8 +42,37 @@ class HeadingDecoder(nn.Module):
         self.register_buffer("source_index", _idx(source_index))
         self.linear = nn.Linear(len(self.source_index), 2)
 
+    @property
+    def weight(self) -> torch.Tensor:
+        return self.linear.weight
+
+    @property
+    def bias(self) -> torch.Tensor:
+        return self.linear.bias
+
     def forward(self, r: torch.Tensor) -> torch.Tensor:
         return self.linear(r.index_select(-1, self.source_index))
+
+
+class AnatomicalHeadingDecoder(nn.Module):
+    """heading = gain * sum_i r_i (sin a_i, cos a_i) + bias over the EPG neurons with a reliable EB angle a_i."""
+
+    def __init__(self, source_index, angle, reliable, gain_init: float = 0.1):
+        super().__init__()
+        # EPG rates are O(1), so a coherent 47-neuron bump sums to ~10; 0.1 starts the output near unit length
+        self.register_buffer("source_index", _idx(source_index))
+        angle = torch.as_tensor(np.asarray(angle), dtype=torch.float32)
+        keep = torch.as_tensor(np.asarray(reliable), dtype=torch.float32)
+        self.register_buffer("unit", torch.stack([angle.sin(), angle.cos()]) * keep)  # (2, |EPG|)
+        self.gain = nn.Parameter(torch.tensor(float(gain_init)))
+        self.bias = nn.Parameter(torch.zeros(2))
+
+    @property
+    def weight(self) -> torch.Tensor:
+        return self.gain * self.unit
+
+    def forward(self, r: torch.Tensor) -> torch.Tensor:
+        return r.index_select(-1, self.source_index) @ self.weight.T + self.bias
 
 
 class Actor(nn.Module):

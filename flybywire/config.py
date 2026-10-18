@@ -25,6 +25,7 @@ ENUMS = {
     "connectome.mask_type": {"real", "rewire", "er"},
     "core.phi": {"softplus", "relu"},
     "heads.ring_layout": {"anatomical", "tuning", "auto"},
+    "heads.decoder": {"learned", "anatomical"},
     "action.space": {"body_vel_yawrate"},
     "logging.wandb_mode": {"online", "offline", "disabled"},
 }
@@ -110,6 +111,9 @@ def validate_config(cfg: DictConfig) -> Clocks:
     for c in cfg.sweep.conditions:
         if c not in ENUMS["connectome.mask_type"]:
             errors.append(f"sweep.conditions entry {c!r} is not a mask type")
+    for d in cfg.sweep.decoders:
+        if d not in ENUMS["heads.decoder"]:
+            errors.append(f"sweep.decoders entry {d!r} is not a decoder")
     if int(cfg.sweep.max_parallel) < 1:
         errors.append("sweep.max_parallel must be >= 1")
 

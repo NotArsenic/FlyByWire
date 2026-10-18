@@ -113,7 +113,7 @@ def test_inv6_lesion_rates_exactly_zero_every_step(model, conn):
 def test_inv6_epg_lesion_heading_equals_bias(model):
     with lesioned(model, ["EPG"]):
         h = model.run(_inputs(), model.init_state(2))["heading"]
-    bias = model.heading.linear.bias.detach()
+    bias = model.heading.bias.detach()
     assert torch.allclose(h, bias.expand_as(h), atol=0, rtol=0)
 
 
@@ -181,3 +181,46 @@ def test_inv10_all_floating_tensors_fp32(model):
             assert b.dtype in (torch.bool, torch.long), name
     out = model.run(_inputs().half(), model.init_state(2))  # fp16 cache input is upcast
     assert out["r"].dtype == torch.float32 and out["action_mean"].dtype == torch.float32
+
+
+def test_anatomical_decoder_reads_only_epg_and_equals_bias_when_epg_is_lesioned(model_anat, conn):
+    r = torch.rand(3, conn.n)
+    r2 = r.clone()
+    non = np.setdiff1d(np.arange(conn.n), conn.groups["EPG"])
+    r2[:, non] += torch.randn(3, len(non)) * 10
+    assert torch.equal(model_anat.heading(r), model_anat.heading(r2))  # inv. 4
+    with lesioned(model_anat, ["EPG"]):
+        h = model_anat.run(_inputs(), model_anat.init_state(2))["heading"]
+    assert torch.equal(h, model_anat.heading.bias.detach().expand_as(h))  # inv. 6
+
+
+def test_anatomical_decoder_is_a_fixed_population_vector(model_anat, conn):
+    dec = model_anat.heading
+    assert [n for n, _ in dec.named_parameters()] == ["gain", "bias"]
+    with torch.no_grad():
+        dec.gain.fill_(0.5)
+        dec.bias.copy_(torch.tensor([0.1, -0.2]))
+    r = torch.rand(4, conn.n)
+    epg = r[:, conn.groups["EPG"]]
+    unit = dec.unit
+    assert torch.all(unit[:, :4] == 0) and torch.allclose(unit[:, 4:].norm(dim=0), torch.ones(len(unit[0]) - 4))
+    expect = 0.5 * torch.stack([(epg * unit[0]).sum(-1), (epg * unit[1]).sum(-1)], -1) + torch.tensor([0.1, -0.2])
+    assert torch.allclose(dec(r), expect, atol=1e-6)
+    out = model_anat.run(_inputs(), model_anat.init_state(2))
+    out["heading"].pow(2).sum().backward()
+    assert dec.gain.grad is not None and dec.bias.grad is not None
+    assert all(b.dtype in (torch.float32, torch.bool, torch.long) for b in model_anat.buffers())  # inv. 10
+
+
+def test_build_model_anatomical_decoder_from_config(cfg, conn, random_lptc):
+    from omegaconf import OmegaConf
+
+    from flybywire.connectome.masks import eb_angles_path
+    from flybywire.core.heads import AnatomicalHeadingDecoder
+    from flybywire.core.model import build_model
+
+    if not eb_angles_path(cfg).exists():
+        pytest.skip("run scripts/epg_anatomy.py first")
+    c = OmegaConf.merge(cfg, {"heads": {"decoder": "anatomical"}})
+    m = build_model(c, conn=conn, lptc=random_lptc, verbose=False)
+    assert isinstance(m.heading, AnatomicalHeadingDecoder) and int((m.heading.unit != 0).any(0).sum()) == 47

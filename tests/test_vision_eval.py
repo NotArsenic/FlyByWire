@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from flybywire.eval.metrics import angular_error_deg, heading_r2, lagged_heading_r2
-from flybywire.eval.ring import make_layout, ring_activity
+from flybywire.eval.ring import bump, make_layout, ring_activity, ring_tracking
 from flybywire.vision.flowfields import (
     CHANNELS,
     channel_flow,
@@ -93,29 +93,65 @@ def test_lagged_heading_r2_peaks_at_the_decoder_delay():
     assert int(np.argmax(r2)) == 3 and r2[3] == pytest.approx(1.0)
 
 
-def _epg_names():
-    # wedge w <-> side R if w is even else L, glomerulus w // 2 + 1
-    return np.array([f"EPG_{'R' if w % 2 == 0 else 'L'}{w // 2 + 1}" for w in range(16)])
+def _eb_angles():
+    """One neuron per wedge at its centre, the fourth one unreliable."""
+    angle = (np.arange(16) + 0.5) * 2 * np.pi / 16 - np.pi
+    return angle, np.arange(16) != 3
 
 
 def test_ring_layouts():
-    lay = make_layout("auto", _epg_names())
-    assert lay.mode == "anatomical" and lay.parsed_fraction == 1.0
-    assert lay.wedge_of_neuron.tolist() == list(range(16))
+    lay = make_layout("auto", _eb_angles())
+    assert lay.mode == "anatomical"
+    assert lay.wedge_of_neuron.tolist() == [8, 9, 10, -1, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7]
+    assert "anatomical" in lay.label and "15 of 16" in lay.label
     ang = np.deg2rad(np.arange(16) * 22.5 + 1)
     w = np.stack([np.sin(ang), np.cos(ang)])
-    lay2 = make_layout("auto", np.array(["EPG"] * 16), decoder_weight=w)
+    lay2 = make_layout("auto", None, decoder_weight=w)
     assert lay2.mode == "tuning" and lay2.wedge_of_neuron.tolist() == list(range(16))
     assert "tuning" in lay2.label
+    assert make_layout("tuning", _eb_angles(), decoder_weight=w).mode == "tuning"
+    with pytest.raises(ValueError):
+        make_layout("anatomical", None, decoder_weight=w)
     act = ring_activity(np.eye(16), lay2)
     assert np.allclose(act, np.eye(16))
 
 
-def test_real_epg_names_fall_back_to_tuning(conn):
-    epg = conn.groups["EPG"]
-    w = np.random.default_rng(0).standard_normal((2, len(epg)))
-    lay = make_layout("auto", conn.instances[epg], decoder_weight=w)
-    assert lay.mode == "tuning" and lay.parsed_fraction == 0.0  # names look like "EB.27", no glomerulus
+def test_real_eb_angles_fill_every_wedge(cfg, conn):
+    from flybywire.connectome.masks import eb_angles_path, load_eb_angles
+
+    if not eb_angles_path(cfg).exists():
+        pytest.skip("run scripts/epg_anatomy.py first")
+    lay = make_layout("auto", load_eb_angles(cfg, conn))
+    placed = lay.wedge_of_neuron[lay.wedge_of_neuron >= 0]
+    assert lay.mode == "anatomical" and len(placed) == 47 and len(set(placed)) == 16
+
+
+def test_bump_summary():
+    n = 16
+    theta = (np.arange(n) + 0.5) * 2 * np.pi / n
+    out = bump(2 + np.cos(theta - 1.0))
+    assert out["angle"] == pytest.approx(1.0) and out["fraction"] == pytest.approx(1.0)
+    assert out["size"] == pytest.approx(n / 2)
+    assert bump(np.cos(2 * theta))["fraction"] == pytest.approx(0.0, abs=1e-12)
+    assert bump(np.ones(n))["fraction"] == 0.0
+    assert bump(np.stack([np.cos(theta), np.cos(theta - 2.0)]))["angle"] == pytest.approx([0.0, 2.0])
+
+
+def test_ring_tracking_scores_a_rotating_bump_and_a_stuck_one():
+    n = 16
+    theta = (np.arange(n) + 0.5) * 2 * np.pi / n
+    rng = np.random.default_rng(0)
+    heading = [rng.uniform(-np.pi, np.pi, 300) for _ in range(4)]
+
+    def bumps(angle):
+        return [bump(1 + np.cos(theta[None] - a[:, None])) for a in angle]
+
+    follow = ring_tracking(bumps([0.5 - h for h in heading]), heading)  # reflected and offset
+    assert follow["alignment"] > 0.99 and follow["sign"] == -1 and follow["fraction_mean"] > 0.99
+    assert follow["alignment_null"] < 0.2
+    stuck = ring_tracking(bumps([np.zeros(300)] * 4), heading)
+    assert stuck["alignment"] < 0.2
+    assert ring_tracking(bumps([0.5 - h for h in heading]), heading, washout=50)["n_frames"] == 4 * 250
 
 
 def test_ring_plot_labels_layout():
@@ -126,7 +162,7 @@ def test_ring_plot_labels_layout():
 
     from flybywire.eval.ring import plot_ring
 
-    lay = make_layout("anatomical", _epg_names())
+    lay = make_layout("anatomical", _eb_angles())
     fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
     plot_ring(ax, np.arange(16.0), lay, heading_rad=0.3)
     assert "anatomical" in ax.get_title()

@@ -6,7 +6,7 @@ model of the fly optic lobe feeding a recurrent network wired like the FlyWire c
 <!-- Demo: lesion video (scripts/render_lesion_video.py) goes here once available, e.g.
 <p align="center"><img src="docs/media/lesion_demo.gif" width="720"></p> -->
 
-> **Status:** corridor env, scripted expert, expert data and T4/T5 cache are done; Gates 1 and 2 pass.
+> **Status:** env, expert data, BC + DAgger and the real-vs-rewired sweep are done. Gates 1 and 2 pass, Gate 3 fails (no single bump on the anatomical ring).
 > PPO, dashboard and video are stubs; nothing has been trained yet.
 
 ## What is reused vs. built
@@ -120,7 +120,7 @@ al., 2024). Downloading may require signing in to FlyWire Codex and accepting it
    synapses across neuropils *before* applying `min_synapses` (5), so prefer an unthresholded
    variant if one is offered.
 3. Download the **cell-type annotation** table (root id → cell type), and optionally the **names**
-   table (root id → name; used for the anatomical ring layout).
+   table (root id → name).
 4. Put the files in `data/flywire/raw/`. The default expected names and columns are under
    `connectome.flywire` in `configs/default.yaml`. **Verify them against your files.** On a
    mismatch the loader prints the columns it found and stops.
@@ -159,7 +159,7 @@ make params      # effective trainable parameters (W counted on-mask only)
 |---|---|---|---|
 | 1 | Can frozen flyvis be stepped frame by frame with carried state, fast enough? | (a) one call vs. (b) per-frame with state agree to ≤ 1e-5 relative, **and** ≥ 100 batched steps/s at B = 12 | **PASS** (2.7e-7; 634 steps/s) |
 | 2 | Is yaw rate linearly decodable from T4/T5 in the corridor? | ridge regression T4/T5 → yaw rate on held-out trajectories, R² > 0.5 | **PASS** (test R² 0.787, 60 held-out episodes) |
-| 3 | Does the trained core carry heading in EPG? | heading decode from EPG R² > 0.8 **and** the ring shows a single bump rotating with yaw | pending |
+| 3 | Does the trained core carry heading in EPG? | heading decode from EPG R² > 0.8 **and** the ring shows a single bump rotating with yaw (anatomical EB layout: first-harmonic share > 0.5, bump-heading alignment > 0.8) | **FAIL** (R² 0.97 and alignment 0.98 pass with the anatomical readout; bump share at most 0.45) |
 
 ## Repo layout
 
@@ -184,12 +184,19 @@ docs/DECISIONS.md           dated decisions and every deviation from the spec
 
 ## Results
 
-TBD. Nothing has been trained on the FlyWire connectome yet.
+BC on 1000 turning-expert episodes, scored on 100 held-out episodes; mean ± sd over seeds 0, 1, 2
+(`runs/sweep_turns/results.json`, D35). "learned" is the free 2 × 51 heading readout, "anatomical"
+the fixed population vector over EPG EB angles. Bump share and alignment are on the anatomical ring.
 
-| Condition | Heading R² (EPG) | Angular error | Action MSE | Seeds |
-|---|---|---|---|---|
-| real | TBD | TBD | TBD | 0, 1, 2 |
-| rewire | TBD | TBD | TBD | 0, 1, 2 |
+| Mask / readout | Heading R² | Angular error | Action MSE | Bump share | Closed-loop success |
+|---|---|---|---|---|---|
+| real / learned | 0.973 ± 0.002 | 4.70° | 0.020 | 0.17 ± 0.03 | 0.56 ± 0.06 |
+| rewire / learned | 0.968 ± 0.004 | 5.16° | 0.020 | 0.15 ± 0.07 | 0.57 ± 0.04 |
+| real / anatomical | 0.974 ± 0.001 | 4.57° | 0.019 | 0.34 ± 0.10 | 0.25 ± 0.32 |
+| rewire / anatomical | 0.973 ± 0.003 | 4.78° | 0.019 | 0.19 ± 0.02 | 0.39 ± 0.20 |
+
+Only the bump share under the anatomical readout separates real from rewired wiring beyond seed
+spread, and it stays below Gate 3's 0.5. The expert flies 100% of the closed-loop episodes.
 
 Figures (placeholders): real vs. rewired adjacency; ring bump vs. heading; heading decode per
 condition; lesion effects; BC → PPO success rate.

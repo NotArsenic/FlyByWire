@@ -7,7 +7,6 @@ import pandas as pd
 import pytest
 
 from flybywire.connectome import Connectome, directed_rewire, erdos_renyi_like, match_groups
-from flybywire.connectome.celltypes import parse_pb_glomerulus, pb_glomerulus_to_wedge
 
 
 def _random_digraph(n=200, p=0.05, seed=0):
@@ -64,14 +63,6 @@ def test_match_groups_disjoint():
     assert g["EPG"].tolist() == [0, 1] and g["PEN"].tolist() == [2] and g["ER"].tolist() == [4]
     with pytest.raises(ValueError):
         match_groups(types, {"A": ["EPG*"], "B": ["EP*"]})
-
-
-def test_pb_glomerulus_parsing():
-    assert parse_pb_glomerulus("EPG_R3") == ("R", 3)
-    assert parse_pb_glomerulus("EPG(PB08)_L4") == ("L", 4)
-    assert parse_pb_glomerulus("Delta7_00") is None
-    assert pb_glomerulus_to_wedge("R", 1) == 0 and pb_glomerulus_to_wedge("L", 8) == 15
-    assert pb_glomerulus_to_wedge("R", 9) is None
 
 
 def test_connectome_npz_roundtrip(conn, tmp_path):

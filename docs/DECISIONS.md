@@ -479,3 +479,30 @@ Topography (turns_s0, dagger1, dagger2): phi is now well determined (bootstrap h
 cos/sin SE ratio 0.8) and spread over the circle, and activity phi matches decoder weights
 (0.55-0.63, p 1e-4), but alignment with the EB angle is 0.22-0.30 (p 0.03-0.19 uncorrected;
 decoder 0.08-0.22, p >= 0.2). The network's heading code is unrelated to the anatomical layout.
+
+## 2026-10-18 — D35. Anatomical ring and readout, Gate 3, darkness test, real vs rewired
+
+D19's name parsing is gone (supersedes D19 and D27's note that `auto` always means `tuning`). The
+`anatomical` ring layout bins the 47 reliable EPGs by EB angle (D32) into 16 wedges; `auto` uses
+it when `epg_eb_angles.npz` exists. `heads.decoder: anatomical` replaces the learned 2 x 51 heading
+readout with gain * sum r_i (sin a_i, cos a_i) + bias over reliable EPGs, so only gain and bias
+are learned. Gate 3 thresholds, fixed before looking: test R^2 > 0.8, mean first-harmonic share
+of the 16-wedge profile > 0.5 (about a 53 deg FWHM Gaussian bump), bump-angle vs heading
+alignment > 0.8, on data/cache_turns_test and the anatomical layout; tuning layout is reference
+only. The darkness test swaps T4/T5 for the flyvis grey steady state for 2 s. That input is not
+zero in LPTC space (forward and loom_left about +3.4) but within ~1 sd of the episode-start
+(hover) input, so D14's per-subtype baseline doesn't cancel a static scene.
+
+12 BC runs (real/rewire x learned/anatomical readout x seeds 0-2, runs/sweep_turns, 51 min at 3 in
+parallel). R^2 is 0.97 everywhere; the anatomical readout costs nothing, for rewired masks too
+(ring alignment 0.98 both). No run passes Gate 3: single-bump share 0.15-0.34 per condition (best
+run real_anatomical_s2: R^2 0.973, alignment 0.982, share 0.449). The one mask difference outside
+seed spread is that share under the anatomical readout (real 0.34 +/- 0.10, rewired 0.19 +/- 0.02).
+With the learned readout the real mask has slightly higher R^2 (0.973 vs 0.968, 4.7 vs 5.2 deg).
+Topography, ring alignment, darkness drift and closed-loop success don't separate masks at n=3.
+A learned readout's heading code is unrelated to EB anatomy (alignment ~0.2, null).
+
+In darkness the trained recurrence holds the decoded heading with a leak: drift ~12 deg at 0.5 s
+and 16-42 deg at 2 s, against ~110 deg with recurrent weights zeroed. Anatomical-readout runs fly
+worse and very unevenly in closed loop (0.06 to 0.62 per run, SE 0.07) at the same open-loop
+action MSE; not explained.

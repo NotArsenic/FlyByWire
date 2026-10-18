@@ -6,7 +6,6 @@ Convention (used everywhere): ``M[i, j] = True`` iff **presynaptic i -> postsyna
 from __future__ import annotations
 
 import fnmatch
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -19,7 +18,7 @@ class Connectome:
     M: np.ndarray  # (N, N) bool, M[pre, post]
     neuron_ids: np.ndarray  # (N,) int64
     types: np.ndarray  # (N,) str, cell-type label
-    instances: np.ndarray  # (N,) str, instance / name (for ring layout parsing)
+    instances: np.ndarray  # (N,) str, instance / name
     groups: dict[str, np.ndarray]  # group name -> sorted int64 indices
     source: str = "unknown"
     meta: dict = field(default_factory=dict)
@@ -112,27 +111,3 @@ def match_groups(types: Sequence[str], patterns: Mapping[str, Sequence[str]]) ->
                 groups[g].append(i)
     return {g: np.asarray(v, dtype=np.int64) for g, v in groups.items()}
 
-
-# Protocerebral-bridge glomerulus parsing for the anatomical ring layout.
-_PB_GLOM = re.compile(r"(?:^|[^A-Za-z0-9])(?:PB)?_?([LR])([1-9])(?![0-9])")
-
-
-def parse_pb_glomerulus(instance: str) -> tuple[str, int] | None:
-    """(side, glomerulus 1..9) parsed from an instance name like ``EPG_R3`` / ``EPG(PB08)_L4``, or None."""
-    m = _PB_GLOM.findall(str(instance))
-    if not m:
-        return None
-    side, g = m[-1]
-    return side, int(g)
-
-
-def pb_glomerulus_to_wedge(side: str, g: int, n_wedges: int = 16) -> int | None:
-    """Map a PB glomerulus to one of ``n_wedges`` EB wedges.
-
-    Approximate convention (see docs/DECISIONS.md): each PB half tiles the full ring with
-    glomeruli 1..8, the two halves interleaved by half a glomerulus:
-    ``wedge = 2 (g - 1) + (0 if R else 1)``. Glomerulus 9 and n_wedges != 16 are not mapped.
-    """
-    if n_wedges != 16 or not 1 <= g <= 8 or side not in ("L", "R"):
-        return None
-    return 2 * (g - 1) + (0 if side == "R" else 1)

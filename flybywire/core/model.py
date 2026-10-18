@@ -15,11 +15,12 @@ from collections.abc import Iterable
 
 import numpy as np
 import torch
+from omegaconf import OmegaConf
 from torch import nn
 
 from flybywire.clocks import Clocks, clocks_from_cfg
 from flybywire.connectome.celltypes import Connectome
-from flybywire.core.heads import Actor, Critic, HeadingDecoder, InputProjection
+from flybywire.core.heads import Actor, AnatomicalHeadingDecoder, Critic, HeadingDecoder, InputProjection
 from flybywire.core.lesion import keep_mask
 from flybywire.core.population import CentralComplex
 
@@ -41,6 +42,7 @@ class FlyByWireModel(nn.Module):
         phi: str = "softplus",
         input_dependent_alpha: bool = False,
         log_std_init: float = -1.5,
+        eb_angles: tuple | None = None,
         seed: int = 0,
         verbose: bool = True,
     ):
@@ -63,7 +65,10 @@ class FlyByWireModel(nn.Module):
             generator=gen,
             verbose=verbose,
         )
-        self.heading = HeadingDecoder(self.groups[heading_group])
+        if eb_angles is None:
+            self.heading = HeadingDecoder(self.groups[heading_group])
+        else:
+            self.heading = AnatomicalHeadingDecoder(self.groups[heading_group], *eb_angles)
         self.actor = Actor(self.groups[actor_group], n_actions, log_std_init)
         self.critic = Critic(conn.n)
 
@@ -117,10 +122,13 @@ class FlyByWireModel(nn.Module):
 
 def build_model(cfg, conn: Connectome | None = None, lptc: nn.Module | None = None, verbose: bool = True):
     """Build the model from config. Loads the connectome / LPTC templates unless given."""
-    from flybywire.connectome.masks import build_connectome
+    from flybywire.connectome.masks import build_connectome, load_eb_angles
 
     if conn is None:
         conn = build_connectome(cfg)
+    eb_angles = None
+    if OmegaConf.select(cfg, "heads.decoder", default="learned") == "anatomical":
+        eb_angles = load_eb_angles(cfg, conn)
     if lptc is None and cfg.vision.backend == "flyvis":
         from flybywire.vision.lptc import lptc_from_cfg
 
@@ -139,6 +147,7 @@ def build_model(cfg, conn: Connectome | None = None, lptc: nn.Module | None = No
         phi=cfg.core.phi,
         input_dependent_alpha=bool(cfg.core.input_dependent_alpha),
         log_std_init=float(cfg.heads.log_std_init),
+        eb_angles=eb_angles,
         seed=int(cfg.seed),
         verbose=verbose,
     )

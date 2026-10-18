@@ -6,9 +6,10 @@ import numpy as np
 import pytest
 import torch
 
+from flybywire.clocks import clocks_from_cfg
 from flybywire.config import load_config
 from flybywire.connectome.masks import load_base_connectome
-from flybywire.core.model import build_model
+from flybywire.core.model import FlyByWireModel, build_model
 from flybywire.vision.lptc import LPTCPool
 
 
@@ -65,3 +66,12 @@ def model(cfg, conn, random_lptc):
     with torch.no_grad():
         m.core.b.normal_(0, 0.5)
     return m
+
+
+@pytest.fixture()
+def model_anat(cfg, conn, random_lptc):
+    """Anatomical heading decoder on synthetic angles; the first four EPG neurons are unreliable."""
+    n = len(conn.groups["EPG"])
+    angle = np.random.default_rng(0).uniform(-np.pi, np.pi, n)
+    torch.manual_seed(0)
+    return FlyByWireModel(conn, random_lptc, clocks_from_cfg(cfg), eb_angles=(angle, np.arange(n) >= 4), verbose=False)

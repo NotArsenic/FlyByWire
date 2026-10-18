@@ -27,8 +27,8 @@ import numpy as np
 import torch
 
 from flybywire.clocks import clocks_from_cfg
-from flybywire.config import REPO_ROOT, data_dir
-from flybywire.connectome.masks import load_base_connectome
+from flybywire.config import REPO_ROOT
+from flybywire.connectome.masks import load_base_connectome, load_eb_angles
 from flybywire.data.cache import T4T5Cache
 from flybywire.eval.closed_loop import checkpoint_cache, load_checkpoint
 from flybywire.eval.topography import (
@@ -173,11 +173,8 @@ def main(argv=None) -> int:
     cache = T4T5Cache(args.cache or checkpoint_cache(ckpt, cfg))
     data = BCData(cache, clocks)
     val = val_split(len(data), int(cfg.seed))
-    anat = np.load(args.angles or data_dir(cfg) / "flywire" / "processed" / "epg_eb_angles.npz")
     epg = model.groups["EPG"]
-    if not np.array_equal(anat["neuron_ids"], load_base_connectome(cfg).neuron_ids[epg]):
-        raise SystemExit("anatomical angles are not in the model's EPG order")
-    theta, ok = anat["angle_rad"], anat["reliable"]
+    theta, ok = load_eb_angles(cfg, load_base_connectome(cfg), args.angles)
 
     rates, heading = epg_rates(model, data, val, device, args.washout)
     h = np.concatenate(heading)
@@ -186,7 +183,7 @@ def main(argv=None) -> int:
     boot = bootstrap_tuning(moments, args.n_boot)
     half = phi_spread(fit["phi"], boot["phi"])
     slope_z = fit["slope"] / np.maximum(boot["slope"].std(0), 1e-12)
-    dec_w = model.heading.linear.weight.detach().cpu().numpy()
+    dec_w = model.heading.weight.detach().cpu().numpy()
     dec_phi = decoder_angle(dec_w)
 
     well = half < np.deg2rad(45)

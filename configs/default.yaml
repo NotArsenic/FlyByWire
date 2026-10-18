@@ -42,7 +42,7 @@ connectome:
     snapshot: 783
     connections_file: connections_princeton.csv
     annotations_file: consolidated_cell_types.csv
-    names_file: names.csv    # optional (instance names for the anatomical ring layout); "" to skip
+    names_file: names.csv    # optional (instance names); "" to skip
     columns:
       pre: pre_root_id
       post: post_root_id
@@ -63,7 +63,8 @@ core:
 heads:
   log_std_init: -1.5
   ring_wedges: 16
-  ring_layout: auto        # anatomical | tuning | auto
+  ring_layout: auto        # anatomical | tuning | auto (anatomical if the EB angles file exists)
+  decoder: learned         # learned | anatomical (fixed weights from the EB angle, only gain and bias learned)
 action:
   space: body_vel_yawrate  # [v_forward, v_lateral, v_vertical, yaw_rate]
   limits:                  # initial values
@@ -116,6 +117,7 @@ ppo:
   aux_weight: 0.5
 sweep:
   conditions: [real, rewire]
+  decoders: [learned]
   seeds: [0, 1, 2]
   max_parallel: 6
 logging:
