@@ -388,3 +388,43 @@ Not part of the gate: shifting the target against the features (pooled, same spl
 0.68 at -40 ms, 0.75 at 0, 0.84 at +40 ms, a peak of 0.89 at +80 ms and 0.88 at +120 ms. T4/T5
 activity reflects the yaw rate of ~80 ms earlier, which is the right sign for a sensory delay (a
 flipped alignment would peak at negative lags). The core will get yaw rate ~80 ms late.
+
+## 2026-10-18 — D31. First BC run on the real connectome (seed 0)
+
+`python -m flybywire.train.bc --out runs/bc/real_s0`, default config: 270 train / 30 validation
+episodes, 50 epochs, 3,600 updates, 131 s. Validation: heading R^2 0.636 (joint sin/cos), mean
+heading error 6.5 deg (predicting 0 gives 11.1 deg), action MSE 0.024 (predicting the mean gives
+0.039). Per action: yaw rate R^2 0.47, lateral 0.47, forward 0.28; vertical has almost no
+variance because the expert holds altitude.
+
+Heading error grows through the episode, 3.7 deg in the first second to 8.5 deg in the last, so
+the core integrates with drift. On training episodes heading R^2 is 0.80 (error 5.3 deg) with
+the same action MSE, so the heading readout partly overfits 270 episodes. That is below the
+Gate 3 threshold of 0.8, though Gate 3 itself (with the ring check) isn't implemented yet. Loss
+was still falling at epoch 50; bc.py has no per-epoch validation, so the best stopping point is
+unknown. Headings are small here (rel_yaw sd 14.5 deg), which makes R^2 sensitive to a few
+degrees of error.
+
+## 2026-10-18 — D32. EPG anatomical angles, topography baseline, closed-loop eval
+
+`scripts/epg_anatomy.py` gives each EPG neuron an angle around the EB from the FlyWire skeletons.
+The EB is the blob of smoothed ER node density above 30% of peak that contains the joint ER/EPG
+peak, which leaves out the bulbs. Ring normal = smallest PCA axis of EPG nodes in it; zero is
+dorsal, positive toward +x (in-plane PCA axes were unstable on a nearly round ring). 47 of 51
+EPGs get stable angles (1-2 deg RMS across thresholds); the 4 EPGt barely enter the EB and are
+flagged. Angles cover all 16 wedges (2-4 each), and angular distance predicts PEN/PEG/D7 partner
+overlap (Spearman -0.76, p < 1e-4), so the angles are real anatomy, not fitting noise.
+
+Topography on bc/real_s0 is null: alignment of preferred heading with EB angle 0.07 (rates) and
+0.16 (decoder weights), p >= 0.5. Not conclusive: headings are small (sd 14.8 deg), so the cos h
+term is poorly identified (SE 5x that of sin h); EPG rates carry a push-pull 1-D heading signal
+unrelated to anatomy. A perfect ring would still score 0.96 given the bootstrap noise in phi.
+Rerun on the large-turn data.
+
+Closed loop (`scripts/eval_closed_loop.py`, held-out seeds 10000-10049, env and expert from the
+checkpoint's config): the BC policy succeeds in 62% of episodes (19 obstacle hits), 9.4 m mean
+progress, against 100% and 12.1 m for the expert. Heading error 5.9 deg. Action MSE against the
+expert's label on states the policy visits is 0.199, eight times the open-loop 0.024, mostly yaw
+rate and lateral velocity: the compounding error behavior cloning is known for. `--record` saves
+those episodes with expert labels (wander off: in DAgger the policy's own errors diversify the
+states, and wander in a label is noise the input can't predict).
