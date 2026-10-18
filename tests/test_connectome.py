@@ -1,4 +1,4 @@
-"""Toy graph, rewire statistics, ER null, groups, npz I/O, FlyWire loader schema handling."""
+"""FlyWire graph, rewire statistics, ER null, groups, npz I/O, FlyWire loader schema handling."""
 
 from __future__ import annotations
 
@@ -17,22 +17,12 @@ def _random_digraph(n=200, p=0.05, seed=0):
     return M
 
 
-def test_toy_shape_and_groups(toy):
-    assert toy.n == 96
-    sizes = {g: len(v) for g, v in toy.groups.items()}
-    assert sizes == {"ER": 32, "EPG": 16, "PEN": 16, "PEG": 16, "D7": 8, "PFL3": 8}
-    assert not toy.M.diagonal().any()
-    er, pfl3 = toy.groups["ER"], toy.groups["PFL3"]
-    assert toy.M[:, er].sum() == 0  # ER is pure input
-    assert toy.M[pfl3].sum() == 0  # PFL3 is pure output in the toy
-
-
-def test_toy_warns_loudly(caplog):
-    from flybywire.connectome.toy import generate_toy
-
-    with pytest.warns(UserWarning, match="toy connectome"):
-        generate_toy()
-    assert any("TOY CONNECTOME" in r.getMessage() for r in caplog.records)
+def test_flywire_graph_shape_and_groups(conn):
+    assert conn.n == 457 and conn.source == "flywire"
+    sizes = {g: len(v) for g, v in conn.groups.items()}
+    assert sizes == {"ER": 278, "EPG": 51, "PEN": 42, "PEG": 20, "D7": 42, "PFL3": 24}
+    assert not conn.M.diagonal().any()
+    assert sum(sizes.values()) == conn.n  # groups are disjoint and cover every neuron
 
 
 @pytest.mark.parametrize("seed", [0, 1])
@@ -84,34 +74,35 @@ def test_pb_glomerulus_parsing():
     assert pb_glomerulus_to_wedge("R", 9) is None
 
 
-def test_connectome_npz_roundtrip(toy, tmp_path):
+def test_connectome_npz_roundtrip(conn, tmp_path):
     p = tmp_path / "g.npz"
-    toy.save(p)
+    conn.save(p)
     back = Connectome.load(p)
-    assert np.array_equal(back.M, toy.M) and back.source == "toy"
-    assert all(np.array_equal(back.groups[g], toy.groups[g]) for g in toy.groups)
-    assert np.array_equal(back.instances, toy.instances)
+    assert np.array_equal(back.M, conn.M) and back.source == conn.source
+    assert all(np.array_equal(back.groups[g], conn.groups[g]) for g in conn.groups)
+    assert np.array_equal(back.instances, conn.instances)
 
 
-def _write_fake_flywire(raw):
+def _write_fake_flywire(raw, cfg):
+    fw = cfg.connectome.flywire
     raw.mkdir(parents=True)
     ann = pd.DataFrame({"root_id": [1, 2, 3, 4, 5, 6, 7], "primary_type": ["ER1", "EPG", "EPG", "PEN_a", "PEG",
                                                                              "Delta7", "PFL3"]})
-    ann.to_csv(raw / "consolidated_cell_types.csv.gz", index=False)
+    ann.to_csv(raw / fw.annotations_file, index=False)
     con = pd.DataFrame({
         "pre_root_id": [1, 1, 2, 2, 3, 4, 2, 9],
         "post_root_id": [2, 2, 4, 2, 7, 3, 5, 2],
         "neuropil": ["EB", "EB_L", "EB", "EB", "LAL", "PB", "EB", "EB"],
         "syn_count": [3, 4, 10, 50, 6, 2, 5, 99],
     })
-    con.to_csv(raw / "connections.csv.gz", index=False)
-    pd.DataFrame({"root_id": [2, 3], "name": ["EPG_R1", "EPG_L1"]}).to_csv(raw / "names.csv.gz", index=False)
+    con.to_csv(raw / fw.connections_file, index=False)
+    pd.DataFrame({"root_id": [2, 3], "name": ["EPG_R1", "EPG_L1"]}).to_csv(raw / fw.names_file, index=False)
 
 
 def test_flywire_loader_on_fake_tables(cfg, tmp_path):
     from flybywire.connectome.flywire import load_flywire_cx
 
-    _write_fake_flywire(tmp_path / "raw")
+    _write_fake_flywire(tmp_path / "raw", cfg)
     conn = load_flywire_cx(cfg, tmp_path / "raw", verbose=False)
     ids = conn.neuron_ids.tolist()
     assert sorted(ids) == [1, 2, 3, 4, 5, 6, 7]
@@ -129,7 +120,7 @@ def test_flywire_loader_schema_mismatch(cfg, tmp_path, capsys):
 
     from flybywire.connectome.flywire import SchemaError, load_flywire_cx
 
-    _write_fake_flywire(tmp_path / "raw")
+    _write_fake_flywire(tmp_path / "raw", cfg)
     bad = OmegaConf.merge(cfg, OmegaConf.create({"connectome": {"flywire": {"columns": {"type": "cell_type"}}}}))
     with pytest.raises(SchemaError):
         load_flywire_cx(bad, tmp_path / "raw", verbose=False)

@@ -3,7 +3,7 @@
 
 Renders a synthetic textured scene drifting horizontally under a random-walk yaw rate (8 fake
 trajectories of 300 core steps = 75 decisions, saved to data/smoke/expert/), builds the T4/T5
-cache with frozen flyvis (data/smoke/cache/), then runs BC on the toy connectome for 200 updates
+cache with frozen flyvis (data/smoke/cache/), then runs BC on the FlyWire connectome for 200 updates
 with target action = yaw rate proportional to -rel_yaw. Asserts every loss is finite and the total
 loss drops by >= 30%; prints the heading-decode R².
 
@@ -82,7 +82,6 @@ def main() -> int:
         dm_path.write_text(json.dumps(dm, indent=2))
         del stepper
     cfg = load_config(overrides=[
-        "connectome.source=toy",
         f"lptc.direction_map={dm_path}",
         f"bc.batch_episodes={N_TRAJ}",
         f"paths.runs_dir={runs_dir(base_cfg)}",
@@ -92,7 +91,7 @@ def main() -> int:
     make_trajectories(cfg, eye, traj_dir)
     print("[smoke] 2/4 build cache")
     build_cache_script.run(cfg, traj_dir, cache_dir, batch=N_TRAJ, device=device)
-    print("[smoke] 3/4 BC (toy connectome)")
+    print("[smoke] 3/4 BC (FlyWire connectome)")
     res = train_bc(cfg, cache_dir, runs_dir(cfg) / "smoke" / "bc", n_updates=N_UPDATES, device=device,
                    log_every=25)
     hist = res["history"]

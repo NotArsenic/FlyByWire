@@ -5,7 +5,7 @@
 trainable elements. Reports the ratio of connectome parameters (on-mask W) to LPTC parameters for
 the configured LPTC mode and for all three modes.
 
-Usage: python scripts/count_params.py [key=value ...]   (e.g. connectome.source=flywire)
+Usage: python scripts/count_params.py [key=value ...]   (e.g. connectome.mask_type=rewire)
 """
 
 from __future__ import annotations
@@ -60,8 +60,6 @@ def main(argv=None) -> int:
         ratio = f"{conn_params / n_lptc:.2f}" if n_lptc else "inf (LPTC frozen)"
         mark = "  <- configured" if mode == cfg.lptc.mode else ""
         print(f"  {mode:<7} LPTC={n_lptc:>7,d}  ratio={ratio}{mark}")
-    if cfg.connectome.source == "toy":
-        print("\nNOTE: toy connectome — counts are for plumbing only; rerun with connectome.source=flywire.")
     return 0
 
 

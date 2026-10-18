@@ -124,7 +124,7 @@ al., 2024). Downloading may require signing in to FlyWire Codex and accepting it
    `connectome.flywire` in `configs/default.yaml`. **Verify them against your files.** On a
    mismatch the loader prints the columns it found and stops.
 5. `python -m flybywire.connectome.flywire` prints the matched types, N, edge count and density,
-   and writes `data/flywire/processed/cx_graph.npz`. Then set `connectome.source: flywire`.
+   and writes `data/flywire/processed/cx_graph.npz`, which the model, tests and smoke run load.
 
 **Storage budget**
 
@@ -142,8 +142,8 @@ al., 2024). Downloading may require signing in to FlyWire Codex and accepting it
 
 ```bash
 make check       # environment table
-make test        # pytest; GPU / flyvis tests skip with a reason when unavailable
-make smoke       # synthetic end-to-end plumbing run (~20 s). NOT a result.
+make test        # pytest; GPU, flyvis and FlyWire-graph tests skip with a reason when unavailable
+make smoke       # end-to-end plumbing run on synthetic trajectories + the FlyWire graph (~20 s). NOT a result.
 make gate1       # flyvis state-carry equivalence + throughput -> runs/gate1/report.json
 make calibrate   # T4/T5 preferred directions -> data/flyvis/direction_map.json
 make params      # effective trainable parameters (W counted on-mask only)
@@ -164,7 +164,7 @@ configs/default.yaml        single source of truth (clocks, vision, connectome, 
 flybywire/
   config.py, clocks.py      config load/validation; the one definition of decision timing
   paths.py                  safe flyvis import (absolute root dir, default-device fix)
-  connectome/               toy graph, FlyWire loader, masks (real / rewire / er), directed rewire
+  connectome/               FlyWire loader, masks (real / rewire / er), directed rewire
   vision/                   BoxEye, frozen flyvis stepper, flow templates, LPTC, directions, Farneback
   core/                     CentralComplex population, heads, lesions, model wiring
   data/                     trajectory format, T4/T5 memmap cache

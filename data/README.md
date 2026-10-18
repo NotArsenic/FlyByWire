@@ -11,4 +11,5 @@ points here by default. On WSL, keep this on the Linux filesystem, never under `
 | `expert/` | `traj_XXXXX.npz`: `hexals (T, 721)` fp16 @ 100 Hz, `actions (T_dec, 4)` fp32 normalized, state arrays, `rel_yaw (T,)`, `yaw_rate (T,)`, `collided`, metadata | `scripts/collect_expert.py` (week 1) |
 | `frames/` | raw frames for at most 20 episodes (debugging and video only) | `scripts/collect_expert.py --save-frames` |
 | `cache/` | `t4t5_fp16.npy` memmap `(total_T, 8, 721)`, `offsets.npy`, `manifest.json` | `scripts/build_cache.py` |
+| `flywire/skeletons/` | `sk_lod1_783_healed_ds2.parquet`, skeletons of all release-783 neurons (Zenodo 10877326, CC BY 4.0; D28) | manual download |
 | `smoke/` | synthetic trajectories + cache for `make smoke` (plumbing only, not a result) | `scripts/smoke_end_to_end.py` |

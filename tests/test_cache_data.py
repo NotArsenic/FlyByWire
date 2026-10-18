@@ -90,7 +90,7 @@ def test_cache_roundtrip(traj_dir, tmp_path):
         cache.check_compatible("flow/0000/000", 0.01)
 
 
-def test_bc_runs_on_cpu_and_uses_episode_targets(traj_dir, tmp_path, cfg, toy):
+def test_bc_runs_on_cpu_and_uses_episode_targets(traj_dir, tmp_path, cfg, conn):
     from flybywire.train.bc import BCData, train_bc
 
     paths = sorted(traj_dir.glob("traj_*.npz"))
@@ -103,9 +103,9 @@ def test_bc_runs_on_cpu_and_uses_episode_targets(traj_dir, tmp_path, cfg, toy):
     from flybywire.config import load_config
     from flybywire.vision.lptc import LPTCPool
 
-    c = load_config(overrides=["connectome.source=toy", "bc.batch_episodes=5", "bc.tbptt_core_steps=16"])
+    c = load_config(overrides=["bc.batch_episodes=5", "bc.tbptt_core_steps=16"])
     lptc = LPTCPool(np.ones((8, 8, 721), np.float32) / 100)
-    res = train_bc(c, out, tmp_path / "run", n_updates=6, device="cpu", verbose=False, conn=toy, lptc=lptc)
+    res = train_bc(c, out, tmp_path / "run", n_updates=6, device="cpu", verbose=False, conn=conn, lptc=lptc)
     assert len(res["history"]) == 6
     assert all(np.isfinite(h["loss"]) for h in res["history"])
     assert (tmp_path / "run" / "metrics.json").exists() and (tmp_path / "run" / "model.pt").exists()

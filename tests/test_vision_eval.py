@@ -85,12 +85,15 @@ def test_metrics():
     assert heading_r2(tgt, tgt, mask) == pytest.approx(1.0)
 
 
-def test_ring_layouts(toy):
-    epg = toy.groups["EPG"]
-    lay = make_layout("auto", toy.instances[epg])
+def _epg_names():
+    # wedge w <-> side R if w is even else L, glomerulus w // 2 + 1
+    return np.array([f"EPG_{'R' if w % 2 == 0 else 'L'}{w // 2 + 1}" for w in range(16)])
+
+
+def test_ring_layouts():
+    lay = make_layout("auto", _epg_names())
     assert lay.mode == "anatomical" and lay.parsed_fraction == 1.0
-    assert sorted(lay.wedge_of_neuron.tolist()) == list(range(16))
-    assert lay.wedge_of_neuron.tolist() == toy.meta["wedge"][epg].tolist()
+    assert lay.wedge_of_neuron.tolist() == list(range(16))
     ang = np.deg2rad(np.arange(16) * 22.5 + 1)
     w = np.stack([np.sin(ang), np.cos(ang)])
     lay2 = make_layout("auto", np.array(["EPG"] * 16), decoder_weight=w)
@@ -100,7 +103,14 @@ def test_ring_layouts(toy):
     assert np.allclose(act, np.eye(16))
 
 
-def test_ring_plot_labels_layout(toy):
+def test_real_epg_names_fall_back_to_tuning(conn):
+    epg = conn.groups["EPG"]
+    w = np.random.default_rng(0).standard_normal((2, len(epg)))
+    lay = make_layout("auto", conn.instances[epg], decoder_weight=w)
+    assert lay.mode == "tuning" and lay.parsed_fraction == 0.0  # names look like "EB.27", no glomerulus
+
+
+def test_ring_plot_labels_layout():
     import matplotlib
 
     matplotlib.use("Agg")
@@ -108,7 +118,7 @@ def test_ring_plot_labels_layout(toy):
 
     from flybywire.eval.ring import plot_ring
 
-    lay = make_layout("anatomical", toy.instances[toy.groups["EPG"]])
+    lay = make_layout("anatomical", _epg_names())
     fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
     plot_ring(ax, np.arange(16.0), lay, heading_rad=0.3)
     assert "anatomical" in ax.get_title()

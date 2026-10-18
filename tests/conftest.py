@@ -1,15 +1,13 @@
-"""Shared fixtures. GPU / flyvis tests are skipped (with a reason) when unavailable."""
+"""Shared fixtures. GPU / flyvis / FlyWire-graph tests are skipped (with a reason) when unavailable."""
 
 from __future__ import annotations
-
-import warnings
 
 import numpy as np
 import pytest
 import torch
 
 from flybywire.config import load_config
-from flybywire.connectome.toy import generate_toy
+from flybywire.connectome.masks import load_base_connectome
 from flybywire.core.model import build_model
 from flybywire.vision.lptc import LPTCPool
 
@@ -42,14 +40,15 @@ def pytest_collection_modifyitems(config, items):
 
 @pytest.fixture(scope="session")
 def cfg():
-    return load_config(overrides=["connectome.source=toy"])
+    return load_config()
 
 
 @pytest.fixture(scope="session")
-def toy():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return generate_toy(seed=0, warn=False)
+def conn(cfg):
+    try:
+        return load_base_connectome(cfg)
+    except FileNotFoundError as e:
+        pytest.skip(str(e))
 
 
 @pytest.fixture()
@@ -59,9 +58,9 @@ def random_lptc():
 
 
 @pytest.fixture()
-def model(cfg, toy, random_lptc):
+def model(cfg, conn, random_lptc):
     torch.manual_seed(0)
-    m = build_model(cfg, conn=toy, lptc=random_lptc, verbose=False)
+    m = build_model(cfg, conn=conn, lptc=random_lptc, verbose=False)
     # make dynamics non-trivial: random biases so rates differ across neurons
     with torch.no_grad():
         m.core.b.normal_(0, 0.5)

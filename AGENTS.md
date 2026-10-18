@@ -16,7 +16,6 @@ Read this before changing code. The full spec lives in the README and `docs/DECI
   `fast` mode uses private `Network._next_state` — rerun `make gate1` after any flyvis upgrade.
 - Do not guess flyvis / gym-pybullet-drones / gymnasium APIs: read the installed source.
 - Environment: Python 3.12, torch cu130 (Blackwell `sm_120`), conda env `flybywire`.
-- Never use the `toy` connectome for reported results (it logs a loud warning).
 - No novelty claims ("first", "novel", "state-of-the-art") anywhere.
 - No `sudo`; do not edit files outside the repo. Ask before jobs longer than ~10 min.
 

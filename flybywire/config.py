@@ -21,7 +21,7 @@ ENUMS = {
     "env.renderer": {"auto", "egl", "tiny"},
     "vision.backend": {"flyvis", "farneback"},
     "lptc.mode": {"frozen", "gains", "full"},
-    "connectome.source": {"toy", "flywire"},
+    "connectome.source": {"flywire"},
     "connectome.mask_type": {"real", "rewire", "er"},
     "core.phi": {"softplus", "relu"},
     "heads.ring_layout": {"anatomical", "tuning", "auto"},

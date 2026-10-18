@@ -10,7 +10,6 @@ import logging
 
 from flybywire.connectome.celltypes import Connectome
 from flybywire.connectome.rewire import directed_rewire, erdos_renyi_like
-from flybywire.connectome.toy import generate_toy
 
 log = logging.getLogger(__name__)
 
@@ -38,25 +37,20 @@ def apply_mask_type(conn: Connectome, mask_type: str, seed: int = 0, swaps_per_e
 
 
 def load_base_connectome(cfg) -> Connectome:
-    """The unmodified graph for ``cfg.connectome.source`` (toy is generated; flywire is loaded)."""
-    src = cfg.connectome.source
-    if src == "toy":
-        return generate_toy(seed=0)
-    if src == "flywire":
-        from flybywire.config import data_dir
+    """The unmodified FlyWire graph from ``data/flywire/processed/cx_graph.npz``."""
+    from flybywire.config import data_dir
 
-        path = data_dir(cfg) / "flywire" / "processed" / "cx_graph.npz"
-        if not path.exists():
-            raise FileNotFoundError(
-                f"{path} not found. Download the FlyWire tables into data/flywire/raw/ "
-                "(see README 'Data') and run `python -m flybywire.connectome.flywire`."
-            )
-        conn = Connectome.load(path)
-        missing = [g for g in cfg.connectome.groups if g not in conn.groups]
-        if missing:
-            raise ValueError(f"{path} lacks groups {missing}; re-run the loader with the current config")
-        return conn
-    raise ValueError(f"unknown connectome.source {src!r}")
+    path = data_dir(cfg) / "flywire" / "processed" / "cx_graph.npz"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} not found. Download the FlyWire tables into data/flywire/raw/ "
+            "(see README 'Data') and run `python -m flybywire.connectome.flywire`."
+        )
+    conn = Connectome.load(path)
+    missing = [g for g in cfg.connectome.groups if g not in conn.groups]
+    if missing:
+        raise ValueError(f"{path} lacks groups {missing}; re-run the loader with the current config")
+    return conn
 
 
 def build_connectome(cfg, seed: int | None = None) -> Connectome:

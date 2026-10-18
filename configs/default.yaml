@@ -27,7 +27,7 @@ lptc:
   mode: gains              # frozen | gains | full
   direction_map: null      # path; null -> $FLYVIS_ROOT_DIR/direction_map.json (make calibrate)
 connectome:
-  source: toy              # toy | flywire
+  source: flywire
   mask_type: real          # real | rewire | er
   min_synapses: 5
   rewire_swaps_per_edge: 10
@@ -40,9 +40,9 @@ connectome:
     PFL3: ["PFL3*"]
   flywire:                 # manual Codex download into data/flywire/raw/; VERIFY names against the files
     snapshot: 783
-    connections_file: connections.csv.gz
-    annotations_file: consolidated_cell_types.csv.gz
-    names_file: names.csv.gz # optional (instance names for the anatomical ring layout); "" to skip
+    connections_file: connections_princeton.csv
+    annotations_file: consolidated_cell_types.csv
+    names_file: names.csv    # optional (instance names for the anatomical ring layout); "" to skip
     columns:
       pre: pre_root_id
       post: post_root_id

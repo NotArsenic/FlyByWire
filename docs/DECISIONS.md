@@ -297,3 +297,30 @@ were left as they were.
 
 This is a project, not a paper, so `paper/` (writeup skeleton and `references.md`) was deleted. The
 citations that only lived in `references.md` are now in the README.
+
+## 2026-10-17 — D27. Toy connectome removed; tests run on the FlyWire graph (N = 457)
+
+`connectome.source` is `flywire` and `flybywire/connectome/toy.py` is gone. Snapshot 783,
+`min_synapses` 5: N = 457, 17,041 edges (ER 278, EPG 51, PEN 42, PEG 20, D7 42, PFL3 24). Tests and
+`make smoke` load `data/flywire/processed/cx_graph.npz`. The `conn` fixture skips with a reason when
+the file is missing, so a clone without the FlyWire download runs 42 of 59 tests. `make params`:
+17,041 on-mask `W`, 20,729 parameters trained in BC, 54,266 with the critic (`lptc.mode: gains`).
+
+Things the toy graph hid:
+- ER receives 7,804 edges and PFL3 sends 40, so ER is not pure input and PFL3 not pure output. The
+  toy-only assertions on that are gone; invariants 1-10 are unchanged and pass.
+- Instance names look like `EB.27`, `PB.EB.2`, `FB.LAL.17` (neuropil + index), so no PB glomerulus
+  parses (0 of 51 EPG). `heads.ring_layout: auto` therefore always resolves to `tuning` here (see
+  D19). The anatomical layout is tested on synthetic `EPG_R3`-style names only.
+- Directed rewire at N = 457 completes all 170,410 target swaps in 0.2 s.
+
+## 2026-10-17 — D28. FlyWire skeletons downloaded for the 3D view
+
+`data/flywire/skeletons/sk_lod1_783_healed_ds2.parquet` (5,355,543,468 bytes, md5
+`a4c104776f33ec539ef859064c4de3df`, matches Zenodo) from Zenodo record 10877326
+(Schlegel et al. 2024 supplement, CC BY 4.0). Skeletons for all 139,273 neurons of release 783,
+generated from lod 1 meshes and 2x downsampled. Columns: `node_id`, `parent_id`, `radius`, `x`, `y`,
+`z` (nm), `neuron` (root id); per-neuron soma node ids are in the parquet schema metadata.
+
+All 457 neurons in `cx_graph.npz` are present (1,137,123 nodes in total, 1,068 to 6,895 per
+neuron), so only a small subset needs reading. Not used by any code yet.
