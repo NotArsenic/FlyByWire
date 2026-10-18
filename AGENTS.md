@@ -68,3 +68,16 @@ PPO uses gymnasium `AutoresetMode.SAME_STEP` (DECISIONS D20).
 `make calibrate` · `make params` · `make lint` · `make lock`
 
 After modifying code, run `graphify update .` to refresh the knowledge graph (git-ignored).
+
+## Code style: write it like a person wrote it
+
+- Comments explain *why*, sparingly. No comment that restates the line below it, no banner or
+  section-divider comments, no "Step 1 / Step 2" narration.
+- Docstrings only where a reader needs them (public entry points, non-obvious units/shapes).
+  Short, plain sentences. No `Args:/Returns:` boilerplate on trivial functions.
+- No defensive code for situations that cannot happen. No try/except that just swallows errors,
+  no over-general helper layers, no single-use abstractions "for flexibility".
+- Plain names (`n_steps`, `hexals`), not `process_data_helper`. Match the surrounding code.
+- Commit messages and `docs/DECISIONS.md` entries read like terse notes from the author:
+  what changed and why, no marketing words, no emoji, no bullet-padding.
+- README text: direct and specific, no filler ("robust", "seamless", "leverage", "comprehensive").
