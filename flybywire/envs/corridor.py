@@ -265,6 +265,9 @@ class CorridorEnv(gym.Env):
         dt = self.clocks.dt_physics
         pos, quat, rpy, vel = av.pos[0], av.quat[0], av.rpy[0], av.vel[0]
         self._target_yaw = float(wrap(self._target_yaw + cmd[3] * dt))
+        # the controller's yaw D term differences against the last step, which jumps 2 pi at +/-pi
+        last = self._ctrl.last_rpy
+        last[2] += 2 * np.pi * np.round((rpy[2] - last[2]) / (2 * np.pi))
         rpm, _, _ = self._ctrl.computeControl(
             control_timestep=dt,
             cur_pos=pos,

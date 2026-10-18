@@ -70,7 +70,7 @@ action:
     v_forward: [0.0, 2.0]
     v_lateral: [-1.0, 1.0]
     v_vertical: [-0.5, 0.5]
-    yaw_rate: [-1.5, 1.5]
+    yaw_rate: [-3.0, 3.0]
 reward: {progress: 1.0, heading: 0.3, collision: -10.0, attitude: -0.05, smoothness: -0.01}
 expert:                    # scripted expert (privileged state); initial values
   speed: 1.5               # forward-speed target, m/s
@@ -84,6 +84,15 @@ expert:                    # scripted expert (privileged state); initial values
   altitude_gain: 1.0
   wander_deg: 8            # sd of a seeded OU heading wander, for state diversity
   wander_tau_s: 1.0
+  maneuvers:               # turn on the spot now and then, then back to heading 0; remove for the plain expert
+    angles_deg: [90, 135, 180, 270, 360]  # excursion size, sign random; 270 and 360 end as full rotations
+    wait_s: [1.0, 3.0]     # idle time before the next maneuver may start
+    hold_s: [0.0, 1.0]     # pause at the far heading
+    peak_rate: 2.5         # rad/s
+    accel: 8.0             # rad/s^2
+    speed: 0.3             # forward-speed target while turning, m/s
+    clear_m: 1.2           # nearest obstacle surface must be farther than this to start
+    clear_ahead_m: 2.2     # ... and so must the front of the next obstacle along x
 bc:
   n_trajectories: 300
   batch_episodes: 32

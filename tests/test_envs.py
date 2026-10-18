@@ -6,9 +6,10 @@ import numpy as np
 import pytest
 
 from flybywire.clocks import clocks_from_cfg
-from flybywire.config import load_config
+from flybywire.config import data_dir, load_config
+from flybywire.data.trajectories import Trajectory, trajectory_path
 from flybywire.envs.corridor import CorridorEnv, body_to_world_velocity, denormalize_action, normalize_action
-from flybywire.envs.expert import ScriptedExpert, surface_distance
+from flybywire.envs.expert import ScriptedExpert, surface_distance, turn_profile
 from flybywire.envs.vec import make_vec_env
 
 
@@ -106,6 +107,93 @@ def test_expert_flies_full_episode_without_collision(cfg, seed):
         assert info["x_progress"] > 5.0
     finally:
         env.close()
+
+
+def fly(cfg, seed):
+    """Run the expert for a full episode without rendering; returns actions and per-frame info."""
+    env = CorridorEnv(cfg)
+    env.render_frame = lambda: np.zeros((env.size, env.size), np.uint8)
+    expert = ScriptedExpert(cfg, seed=seed)
+    try:
+        _, info = env.reset(seed=seed)
+        expert.reset(info)
+        actions, rel_yaw, yaw_rate = [], [info["rel_yaw"]], [info["yaw_rate"]]
+        while True:
+            actions.append(expert.act(info))
+            _, _, term, trunc, info = env.step(actions[-1])
+            if term or trunc:
+                break
+            rel_yaw.append(info["rel_yaw"])
+            yaw_rate.append(info["yaw_rate"])
+        return np.stack(actions), np.concatenate(rel_yaw), np.concatenate(yaw_rate), info
+    finally:
+        env.close()
+
+
+def test_turn_profile():
+    for angle in (0.3, 3.0):
+        s, v, t_end = turn_profile(angle, 2.5, 8.0, 0.0)
+        assert s == 0.0 and v == 0.0
+        s, v, _ = turn_profile(angle, 2.5, 8.0, t_end)
+        assert s == pytest.approx(angle) and v == 0.0
+        t = np.linspace(0, t_end, 200)
+        s, v, _ = np.array([turn_profile(angle, 2.5, 8.0, ti) for ti in t]).T
+        assert (np.diff(s) >= 0).all() and v.max() <= 2.5 + 1e-9
+        np.testing.assert_allclose(np.diff(s) / np.diff(t), 0.5 * (v[1:] + v[:-1]), atol=0.05)
+    assert turn_profile(3.0, 2.5, 8.0, 0.0)[2] == pytest.approx(2.5 / 8.0 * 2 + (3.0 - 2.5**2 / 8.0) / 2.5)
+
+
+# the episode ends before a second maneuver can start
+@pytest.mark.parametrize("angle, span, seconds", [(360, 360, 4.6), (270, 360, 5.2), (135, 135, 4.6)])
+def test_maneuver_turns_and_returns_to_heading_zero(angle, span, seconds):
+    cfg = load_config(overrides=[
+        "env.n_obstacles=0", f"env.episode_seconds={seconds}", f"expert.maneuvers.angles_deg=[{angle}]",
+        "expert.maneuvers.wait_s=[1.0,1.0]", "expert.maneuvers.hold_s=[0.2,0.2]",
+    ])
+    actions, rel_yaw, yaw_rate, info = fly(cfg, seed=0)
+    assert not info["collision"]
+    assert np.degrees(np.ptp(np.unwrap(rel_yaw))) == pytest.approx(span, abs=30)
+    assert abs(rel_yaw[-1]) < 0.4
+    assert np.abs(yaw_rate).max() < cfg.action.limits.yaw_rate[1]
+    assert np.abs(actions[:, 3]).max() < 1.0
+    if span == 360:
+        assert np.abs(rel_yaw).max() > 3.0  # went through +/-pi
+
+
+def test_yaw_crossing_pi_has_no_kick(short_cfg):
+    env = CorridorEnv(short_cfg, seed=0)
+    try:
+        env.reset(seed=0)
+        cmd = np.array([0.0, 0.0, 0.0, 1.0])
+        yaw, rate = [], []
+        for _ in range(int(3.6 * short_cfg.clocks.physics_hz)):
+            env._physics_step(cmd)
+            s = env._state()
+            yaw.append(s["rpy"][2])
+            rate.append(s["yaw_rate"])
+        assert (np.abs(np.diff(yaw)) > np.pi).sum() == 1
+        # the unwrapped D term used to add 0.18 rad/s in one physics step here
+        assert np.abs(np.diff(rate[20:])).max() < 0.02
+    finally:
+        env.close()
+
+
+def test_expert_without_maneuvers_is_unchanged(cfg):
+    plain = load_config()
+    del plain.expert["maneuvers"]
+    never = load_config(overrides=["expert.maneuvers.wait_s=[100,100]"])
+    np.testing.assert_array_equal(fly(plain, seed=3)[0], fly(never, seed=3)[0])
+
+    old = load_config()
+    del old.expert["maneuvers"]
+    old.action.limits.yaw_rate = [-1.5, 1.5]
+    stored = trajectory_path(data_dir(old) / "expert", 0)
+    if not stored.exists():
+        pytest.skip("no stored expert data")
+    actions, rel_yaw, _, _ = fly(old, seed=0)
+    ref = Trajectory.load(stored, load_hexals=False)
+    np.testing.assert_array_equal(actions, ref.actions)
+    np.testing.assert_array_equal(rel_yaw.astype(np.float32), ref.rel_yaw)
 
 
 def test_vec_env_same_step_autoreset(short_cfg):

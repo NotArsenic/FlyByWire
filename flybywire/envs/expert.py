@@ -6,12 +6,20 @@ from obstacle and wall surfaces closer than influence_m. The field direction plu
 wander (seeded OU process, so dodges differ between episodes) is the desired heading, and a
 heading PID turns toward it. Velocity is `speed` along that heading, altitude is held.
 
+With `expert.maneuvers` set, it also turns on the spot now and then: slows down, yaws through a
+large angle, holds, and comes back to the corridor heading, by a full rotation if that is the
+shorter way. The yaw reference follows a trapezoidal rate profile and replaces the heading target
+(no max_heading clip) while the turn lasts. The potential field is in world coordinates, so
+avoidance keeps working at any heading, within the forward-only body speed limits. Without the
+key the expert is the plain one.
+
 It acts on the last frame of each window, which is what decision k sees.
 """
 
 from __future__ import annotations
 
 import numpy as np
+from omegaconf import OmegaConf
 
 from flybywire.clocks import clocks_from_cfg
 from flybywire.envs.corridor import normalize_action, wrap
@@ -32,6 +40,20 @@ def surface_distance(px: float, py: float, obstacle) -> tuple[float, np.ndarray]
     return d, v / d
 
 
+def turn_profile(angle: float, peak: float, accel: float, t: float) -> tuple[float, float, float]:
+    """Angle turned and rate at time t of a rest-to-rest turn of `angle` > 0, plus its duration."""
+    peak = min(peak, np.sqrt(angle * accel))
+    t_acc = peak / accel
+    t_end = 2 * t_acc + (angle - peak * t_acc) / peak
+    if t >= t_end:
+        return angle, 0.0, t_end
+    if t < t_acc:
+        return 0.5 * accel * t * t, accel * t, t_end
+    if t < t_end - t_acc:
+        return 0.5 * peak * t_acc + peak * (t - t_acc), peak, t_end
+    return angle - 0.5 * accel * (t_end - t) ** 2, accel * (t_end - t), t_end
+
+
 class ScriptedExpert:
     def __init__(self, cfg, seed: int | None = None):
         x = cfg.expert
@@ -50,12 +72,19 @@ class ScriptedExpert:
         self.wander_sd = np.deg2rad(float(x.wander_deg))
         self.wander_tau = float(x.wander_tau_s)
         self.rng = np.random.default_rng(seed)
+        self.turns = OmegaConf.select(cfg, "expert.maneuvers", default=None)
+        self.turn_rng = np.random.default_rng(None if seed is None else [seed, 1])
 
     def reset(self, info: dict) -> None:
         self.obstacles = np.asarray(info["obstacles"], dtype=float)
         self.z_target = float(info["pos"][-1][2])
         self.integral = 0.0
         self.wander = 0.0
+        if self.turns is not None:
+            self.t = 0.0
+            self.yaw_u = float(info["rel_yaw"][-1])  # unwrapped rel_yaw
+            self.legs = []
+            self.next_turn = self.turn_rng.uniform(*self.turns.wait_s)
 
     def goal(self, x: float) -> tuple[float, float]:
         """Attractive goal as (distance ahead, y)."""
@@ -89,6 +118,38 @@ class ScriptedExpert:
                 f += self.repulsion * (1.0 / max(d, 0.05) - 1.0 / self.influence) * n
         return f, nearest
 
+    def clear_to_turn(self, x: float, nearest: float) -> bool:
+        ahead = [ob[1] - ob[3] - x for ob in self.obstacles if ob[1] + ob[3] > x]
+        return nearest > self.turns.clear_m and min(ahead, default=np.inf) > self.turns.clear_ahead_m
+
+    def start_turn(self) -> None:
+        rng = self.turn_rng
+        far = float(rng.choice(np.asarray(self.turns.angles_deg))) * rng.choice([-1, 1])
+        home = 360.0 * np.round(far / 360.0)  # nearest multiple of 360, so the short way back to heading 0
+        out = [(far, rng.uniform(*self.turns.hold_s))] if far != home else []
+        self.legs = [(np.deg2rad(angle), hold) for angle, hold in (*out, (home, 0.0))]
+        self.leg_from, self.leg_t = self.yaw_u, 0.0
+
+    def turn(self, x: float, nearest: float, rel_yaw: float) -> tuple[float, float] | None:
+        """Yaw error and rate feedforward while a maneuver runs, None otherwise."""
+        self.t += self.dt
+        self.yaw_u += float(wrap(rel_yaw - self.yaw_u))
+        if not self.legs:
+            if self.t < self.next_turn or not self.clear_to_turn(x, nearest):
+                return None
+            self.start_turn()
+        target, hold = self.legs[0]
+        delta = target - self.leg_from
+        turned, rate, duration = turn_profile(abs(delta), self.turns.peak_rate, self.turns.accel, self.leg_t)
+        ref = self.leg_from + np.sign(delta) * turned
+        self.leg_t += self.dt
+        if self.leg_t >= duration + hold:
+            self.leg_from, self.leg_t = target, 0.0
+            self.legs.pop(0)
+            if not self.legs:
+                self.next_turn = self.t + self.turn_rng.uniform(*self.turns.wait_s)
+        return ref - self.yaw_u, np.sign(delta) * rate
+
     def act(self, info: dict) -> np.ndarray:
         x, y, z = info["pos"][-1]
         rel_yaw = float(info["rel_yaw"][-1])
@@ -99,11 +160,15 @@ class ScriptedExpert:
         self.wander += -a * self.wander + self.wander_sd * np.sqrt(2 * a) * self.rng.standard_normal()
         heading = np.clip(np.arctan2(f[1], f[0]) + self.wander, -self.max_heading, self.max_heading)
 
-        err = float(wrap(heading - rel_yaw))
+        err, ff, speed = float(wrap(heading - rel_yaw)), 0.0, self.speed
+        turning = self.turn(x, nearest, rel_yaw) if self.turns is not None else None
+        if turning is not None:
+            err, ff = turning
+            speed = float(self.turns.speed)
         self.integral = np.clip(self.integral + err * self.dt, -0.5, 0.5)
-        yaw_rate = self.kp * err + self.ki * self.integral - self.kd * float(info["yaw_rate"][-1])
+        yaw_rate = ff + self.kp * err + self.ki * self.integral - self.kd * (float(info["yaw_rate"][-1]) - ff)
 
-        speed = self.speed * np.clip((nearest - 0.2) / 0.8, 0.4, 1.0)
+        speed *= np.clip((nearest - 0.2) / 0.8, 0.4, 1.0)
         world_heading = heading + (yaw - rel_yaw)
         vx, vy = speed * np.cos(world_heading), speed * np.sin(world_heading)
         c, s = np.cos(yaw), np.sin(yaw)

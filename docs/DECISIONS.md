@@ -428,3 +428,26 @@ expert's label on states the policy visits is 0.199, eight times the open-loop 0
 rate and lateral velocity: the compounding error behavior cloning is known for. `--record` saves
 those episodes with expert labels (wander off: in DAgger the policy's own errors diversify the
 states, and wander in a label is noise the input can't predict).
+
+## 2026-10-18 — D33. Turning expert, yaw-wrap fix, data/expert_turns
+
+The plain expert barely turns (rel_yaw sd 14.5 deg, peak ~32 deg), so heading decoding is fragile
+and the EPG ring never sees more than a wedge or two. New `expert.maneuvers`: at random times, when
+the nearest obstacle surface is > 1.2 m and the next obstacle front > 2.2 m ahead, the expert slows
+to 0.3 m/s, yaws to +/-(90..360) deg, holds up to 1 s, then returns to heading 0 the short way (270
+and 360 end as full rotations). The yaw reference follows a trapezoidal rate profile (2.5 rad/s,
+8 rad/s^2) and replaces the heading target, so the 45 deg clip doesn't apply; the world-frame
+potential field keeps avoiding obstacles. `action.limits.yaw_rate` goes to +/-3 rad/s so turns
+don't saturate; that changes action normalisation for new runs only. Without the key, expert and
+env reproduce the old data bit for bit (all 300 stored episodes, and the config in bc/real_s0).
+
+DSLPIDControl's yaw D term differences cur_rpy - last_rpy, which jumps 2 pi when yaw crosses
++/-pi (a 0.18 rad/s kick in one physics step). `_physics_step` now unwraps `last_rpy[2]` next to
+the current yaw; a no-op when yaw doesn't cross pi.
+
+Seeds 0-999: rel_yaw sd 56.7 deg, 35% of episodes with a full rotation, 2 collisions (seeds 354,
+760; the old expert hits both, plus three more, through its centre-line rule for obstacles that
+just miss the axis), mean progress 8.7 m (old 11.8). Requiring 2.0 m ahead at 0.5 m/s added a
+collision after a spin ended 0.9 m from a box; 2.5 m cut full rotations to 22% because obstacles
+are 3.4 m apart. Collection 23.5 min, 432 MB; cache (999,256 x 8 x 721) 11.5 GB in 156 s. Gate 2 on
+it (700/100/200 split): test R^2 0.880 full, 0.778 pooled; best penalty at the grid's lower edge.
