@@ -109,3 +109,15 @@ def test_policy_flight_records_valid_trajectories_that_replay(short_cfg, model, 
     finally:
         env.close()
     np.testing.assert_allclose(Trajectory.load(tmp_path / "traj_00002.npz").state["pos"][:4], info["pos"], atol=1e-6)
+
+
+@pytest.mark.flyvis
+@pytest.mark.gpu
+def test_labelling_expert_can_drop_maneuvers(short_cfg, model):
+    from flybywire.envs.expert import ScriptedExpert
+
+    model = model.cuda().eval()
+    on = PolicyDriver(model, short_cfg, n_envs=1)
+    off = PolicyDriver(model, short_cfg, n_envs=1, label_maneuvers=False)
+    assert ScriptedExpert(on.label_cfg).turns is not None and ScriptedExpert(off.label_cfg).turns is None
+    assert off.label_cfg.expert.wander_deg == 0 and short_cfg.expert.maneuvers is not None

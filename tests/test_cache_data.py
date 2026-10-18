@@ -111,6 +111,30 @@ def test_bc_runs_on_cpu_and_uses_episode_targets(traj_dir, tmp_path, cfg, conn):
     assert (tmp_path / "run" / "metrics.json").exists() and (tmp_path / "run" / "model.pt").exists()
 
 
+def test_bc_scores_validation_each_epoch_and_keeps_best(tmp_path, cfg, conn):
+    from flybywire.config import load_config
+    from flybywire.eval.closed_loop import load_checkpoint
+    from flybywire.train.bc import train_bc
+    from flybywire.vision.lptc import LPTCPool
+
+    paths = []
+    for i in range(10):
+        paths.append(trajectory_path(tmp_path / "expert", i))
+        _make_traj(4, i).save(paths[-1])
+    out = build_cache(paths, tmp_path / "cache", FakeStepper(),
+                      manifest_extra={"flyvis_model": cfg.vision.flyvis_model, "dt": 0.01}, progress=False)
+    c = load_config(overrides=["bc.batch_episodes=9", "bc.tbptt_core_steps=16", "bc.epochs=3"])
+    lptc = LPTCPool(np.ones((8, 8, 721), np.float32) / 100)
+    res = train_bc(c, out, tmp_path / "run", device="cpu", verbose=False, conn=conn, lptc=lptc)
+    scored = [h for h in res["history"] if "val_heading_r2" in h]
+    assert [h["epoch"] for h in scored] == [0, 1, 2]
+    assert all({"val_heading_err_deg", "val_action_mse"} <= h.keys() for h in scored)
+    best = max(scored, key=lambda h: h["val_heading_r2"])["epoch"]
+    assert res["metrics"]["best_epoch"] == best and res["metrics"]["cache"] == str(out.resolve())
+    model, _ = load_checkpoint(tmp_path / "run" / "model_best.pt")
+    assert next(model.parameters()).dtype == torch.float32
+
+
 def test_bc_module_never_imports_flyvis():
     code = "import sys, flybywire.train.bc, flybywire.data.cache; print('flyvis' in sys.modules)"
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)

@@ -7,6 +7,8 @@
 * Loss = MSE(actor mean, expert action) at decision steps (``Clocks``)
   + ``aux_weight`` * MSE(heading decoder, (sin, cos)(rel_yaw)) at every core step.
 * Adam (``bc.lr``), grad-norm clipping (``bc.grad_clip``), ``bc.batch_episodes`` episodes per batch.
+* The validation episodes are scored after every epoch; the epoch with the best validation heading
+  R^2 is also saved as ``model_best.pt``.
 * fp32 compute: the fp16 cache is upcast per window.
 
 CLI::
@@ -169,7 +171,11 @@ def train_bc(
         run = wandb.init(project="flybywire", mode=cfg.logging.wandb_mode, dir=str(out_dir),
                          config=OmegaConf.to_container(cfg, resolve=True))
 
+    def save(name: str) -> None:
+        torch.save({"model": model.state_dict(), "config": OmegaConf.to_container(cfg, resolve=True)}, out_dir / name)
+
     history = []
+    best = {"epoch": None, "heading_r2": -math.inf}
     update = 0
     t_start = time.time()
     for epoch in range(max_epochs):
@@ -202,6 +208,17 @@ def train_bc(
                     break
             if update >= max_updates:
                 break
+        if val_idx:
+            val = evaluate(model, data, val_idx, device, int(bcfg.batch_episodes))
+            history[-1].update({f"val_{k}": v for k, v in val.items()})
+            if val["heading_r2"] > best["heading_r2"]:
+                best = {"epoch": epoch, "heading_r2": val["heading_r2"]}
+                save("model_best.pt")
+            if run is not None:
+                run.log({f"val_{k}": v for k, v in val.items()}, step=update)
+            if verbose:
+                print(f"[bc] epoch {epoch:3d} val heading R2 {val['heading_r2']:.3f} "
+                      f"err {val['heading_err_deg']:.2f} deg act {val['action_mse']:.4f} (best epoch {best['epoch']})")
         if update >= max_updates:
             break
 
@@ -209,13 +226,15 @@ def train_bc(
     metrics = {
         "split": "val" if val_idx else "train",
         **evaluate(model, data, eval_idx, device, int(bcfg.batch_episodes)),
+        "best_epoch": best["epoch"],
         "updates": update,
         "seconds": round(time.time() - t_start, 1),
         "mask_type": cfg.connectome.mask_type,
         "source": cfg.connectome.source,
         "seed": int(cfg.seed),
+        "cache": str(Path(cache_dir).resolve()),
     }
-    torch.save({"model": model.state_dict(), "config": OmegaConf.to_container(cfg, resolve=True)}, out_dir / "model.pt")
+    save("model.pt")
     (out_dir / "history.json").write_text(json.dumps(history))
     (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
     OmegaConf.save(cfg, out_dir / "config.yaml")

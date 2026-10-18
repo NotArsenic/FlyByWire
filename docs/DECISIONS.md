@@ -451,3 +451,31 @@ just miss the axis), mean progress 8.7 m (old 11.8). Requiring 2.0 m ahead at 0.
 collision after a spin ended 0.9 m from a box; 2.5 m cut full rotations to 22% because obstacles
 are 3.4 m apart. Collection 23.5 min, 432 MB; cache (999,256 x 8 x 721) 11.5 GB in 156 s. Gate 2 on
 it (700/100/200 split): test R^2 0.880 full, 0.778 pooled; best penalty at the grid's lower edge.
+
+## 2026-10-18 — D34. BC on the turning data, DAgger, per-epoch validation
+
+train_bc now scores the validation episodes after every epoch (history gets val_*) and saves the
+epoch with the best val heading R^2 as model_best.pt. At lr 1e-3 with no decay val R^2 jumps
+between epochs (0.78 to 0.98 within the last ten), so the last-epoch model.pt is unreliable
+(closed-loop success 42% vs 58% for model_best.pt). bc/turns_s0 (1000 turning episodes, 11,600
+updates, 548 s): heading R^2 0.978 val, 0.975 on 100 fresh expert episodes (data/expert_turns_test,
+seeds 2000-2099, used by no run for training), mean error 4.2 deg, action MSE 0.021. Gate 3's
+R^2 > 0.8 now holds open-loop for every run; the ring check isn't done. Shifting the target back
+in time helps by at most 0.001 (best at 1-2 frames). That doesn't show the 80 ms delay of D30 is
+gone: heading moves little in 80 ms, so this R^2 is nearly blind to it. Target is unchanged.
+
+Closed loop on seeds 10000-10199 (n=200): turns_s0 59.5%, expert 100%. DAgger rounds fly the best
+checkpoint on 300 fresh seeds (21000.., 22000..), label each visited state with the scripted
+expert, and retrain from scratch on the aggregate (build_cache.py takes several --traj-dir).
+Labels have wander and maneuvers off: maneuver onsets are random and invisible to the policy, so a
+maneuver label is noise there. Flying round 1 both ways: 70.5% vs 64.5% success, heading error 5.4
+vs 7.3 deg, val action MSE 0.044 vs 0.060; the success gap is within noise, the rest consistent.
+Round 1 70.5%, round 2 57.5% (SE ~3.4 points), so no round 3: single-seed run-to-run variation
+looks as large as the DAgger effect. The imitation gap on visited states (plain labels) does drop
+from 0.227 to 0.117. Open-loop action MSE is ~10x lower than on visited states; one guess, not
+tested, is that labels depend on obstacle positions the untextured scene barely shows.
+
+Topography (turns_s0, dagger1, dagger2): phi is now well determined (bootstrap half-width 4-5 deg,
+cos/sin SE ratio 0.8) and spread over the circle, and activity phi matches decoder weights
+(0.55-0.63, p 1e-4), but alignment with the EB angle is 0.22-0.30 (p 0.03-0.19 uncorrected;
+decoder 0.08-0.22, p >= 0.2). The network's heading code is unrelated to the anatomical layout.

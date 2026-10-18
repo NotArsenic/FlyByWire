@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 
-from flybywire.eval.metrics import angular_error_deg, heading_r2
+from flybywire.eval.metrics import angular_error_deg, heading_r2, lagged_heading_r2
 from flybywire.eval.ring import make_layout, ring_activity
 from flybywire.vision.flowfields import (
     CHANNELS,
@@ -83,6 +83,14 @@ def test_metrics():
     mask = np.zeros(500, bool)
     mask[:10] = True
     assert heading_r2(tgt, tgt, mask) == pytest.approx(1.0)
+
+
+def test_lagged_heading_r2_peaks_at_the_decoder_delay():
+    th = np.cumsum(np.random.default_rng(1).normal(0, 0.3, 400))
+    tgt = np.stack([np.sin(th), np.cos(th)], 1)
+    pred = np.concatenate([tgt[:3], tgt[:-3]])  # decoded heading at t is the true heading at t - 3
+    r2 = lagged_heading_r2([pred], [tgt], range(6))
+    assert int(np.argmax(r2)) == 3 and r2[3] == pytest.approx(1.0)
 
 
 def _epg_names():

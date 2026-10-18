@@ -45,6 +45,8 @@ def main(argv=None) -> int:
     ap.add_argument("--n-envs", type=int, default=12)
     ap.add_argument("--record", default=None, help="save policy episodes here in the Trajectory format")
     ap.add_argument("--label-wander-deg", type=float, default=0.0, help="wander of the labelling expert")
+    ap.add_argument("--no-label-maneuvers", dest="label_maneuvers", action="store_false",
+                    help="the labelling expert never starts a turning maneuver")
     ap.add_argument("--skip-expert", action="store_true")
     ap.add_argument("--device", default=None)
     args = ap.parse_args(argv)
@@ -58,14 +60,17 @@ def main(argv=None) -> int:
     print(f"{args.n} episodes (seeds {seeds[0]}..{seeds[-1]}), {args.n_envs} envs, checkpoint {ckpt}")
 
     t0 = time.time()
-    driver = PolicyDriver(model, cfg, args.n_envs, label_wander_deg=args.label_wander_deg)
-    meta = {"source": "policy", "checkpoint": str(ckpt), "label_wander_deg": args.label_wander_deg}
+    driver = PolicyDriver(model, cfg, args.n_envs, args.label_wander_deg, args.label_maneuvers)
+    meta = {"source": "policy", "checkpoint": str(ckpt), "label_wander_deg": args.label_wander_deg,
+            "label_maneuvers": args.label_maneuvers}
     policy = fly(cfg, seeds, driver, args.n_envs, record_dir=args.record, meta=meta, progress=True)
     t_policy = time.time() - t0
     report = {
         "checkpoint": str(ckpt),
         "seeds": [seeds[0], seeds[-1]],
         "n_envs": args.n_envs,
+        "label_wander_deg": args.label_wander_deg,
+        "label_maneuvers": args.label_maneuvers,
         "episode_seconds": float(cfg.env.episode_seconds),
         "policy": summarize(policy, clocks),
         "policy_episodes": episode_rows(policy),
@@ -73,7 +78,6 @@ def main(argv=None) -> int:
     }
     if args.record:
         report["recorded_to"] = str(args.record)
-        report["label_wander_deg"] = args.label_wander_deg
 
     if not args.skip_expert:
         t0 = time.time()

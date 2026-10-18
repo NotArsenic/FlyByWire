@@ -2,9 +2,11 @@
 """Build the T4/T5 cache from stored trajectories (hexals) by running frozen flyvis.
 
 Usage:
-  python scripts/build_cache.py [--traj-dir DIR] [--out DIR] [--batch 16] [key=value ...]
+  python scripts/build_cache.py [--traj-dir DIR [DIR ...]] [--out DIR] [--batch 16] [key=value ...]
 
-Defaults: --traj-dir <data_dir>/expert, --out <data_dir>/cache. See flybywire/data/cache.py.
+Defaults: --traj-dir <data_dir>/expert, --out <data_dir>/cache. With several directories the cache
+holds their trajectories one after the other (DAgger rounds on top of the expert data). See
+flybywire/data/cache.py.
 """
 
 from __future__ import annotations
@@ -24,10 +26,13 @@ VISION_KEYS = ["clocks.sensory_hz", "vision.flyvis_model", "vision.boxeye", "vis
                "vision.steady_state_seconds", "env.frame_size", "env.camera_fov_deg"]
 
 
-def run(cfg, traj_dir: Path, out_dir: Path, batch: int, device: str | None = None) -> Path:
-    paths = list_trajectories(traj_dir)
-    if not paths:
-        raise FileNotFoundError(f"no traj_*.npz in {traj_dir}")
+def run(cfg, traj_dirs: list[Path], out_dir: Path, batch: int, device: str | None = None) -> Path:
+    paths = []
+    for d in traj_dirs:
+        found = list_trajectories(d)
+        if not found:
+            raise FileNotFoundError(f"no traj_*.npz in {d}")
+        paths += found
     clocks = clocks_from_cfg(cfg)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     stepper = FlyvisStepper(
@@ -45,7 +50,8 @@ def run(cfg, traj_dir: Path, out_dir: Path, batch: int, device: str | None = Non
         "stepper_mode": stepper.mode,
         "config_hash": config_hash(cfg, VISION_KEYS),
     }
-    print(f"building cache from {len(paths)} trajectories in {traj_dir} -> {out_dir} (device {device})")
+    print(f"building cache from {len(paths)} trajectories in {', '.join(map(str, traj_dirs))} -> {out_dir} "
+          f"(device {device})")
     build_cache(paths, out_dir, stepper, manifest_extra=extra, batch_size=batch)
     cache = T4T5Cache(out_dir)
     print(f"done: {len(cache)} episodes, total_T={cache.data.shape[0]}, shape={cache.data.shape}, "
@@ -55,7 +61,7 @@ def run(cfg, traj_dir: Path, out_dir: Path, batch: int, device: str | None = Non
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--traj-dir", default=None)
+    ap.add_argument("--traj-dir", nargs="+", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--batch", type=int, default=16, help="trajectories per flyvis batch (10-20)")
     ap.add_argument("--device", default=None)
@@ -63,7 +69,8 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     cfg = load_config(overrides=args.overrides)
     base = data_dir(cfg)
-    run(cfg, Path(args.traj_dir or base / "expert"), Path(args.out or base / "cache"), args.batch, args.device)
+    traj_dirs = [Path(d) for d in args.traj_dir] if args.traj_dir else [base / "expert"]
+    run(cfg, traj_dirs, Path(args.out or base / "cache"), args.batch, args.device)
     return 0
 
 

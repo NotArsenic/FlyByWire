@@ -19,14 +19,16 @@ do that, and wander in a label is noise the observations cannot predict.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 import torch
 from omegaconf import OmegaConf
 
 from flybywire.clocks import clocks_from_cfg
-from flybywire.config import ACTION_KEYS, config_hash
+from flybywire.config import ACTION_KEYS, config_hash, data_dir
 from flybywire.data.trajectories import STATE_KEYS, Trajectory, trajectory_path, wrap_angle
 
 ENV_KEYS = ["clocks", "env", "action", "expert", "reward"]
@@ -45,6 +47,16 @@ def load_checkpoint(path, device="cpu"):
     return model.to(device).eval(), cfg
 
 
+def checkpoint_cache(path, cfg) -> Path:
+    """The cache a checkpoint was trained on, from its metrics.json (runs from before that: data/cache)."""
+    metrics = Path(path).parent / "metrics.json"
+    if metrics.exists():
+        trained_on = json.loads(metrics.read_text()).get("cache")
+        if trained_on:
+            return Path(trained_on)
+    return data_dir(cfg) / "cache"
+
+
 def heading_error_deg(pred, rel_yaw) -> np.ndarray:
     """Wrapped angle between the decoded (sin, cos) and the true relative yaw, per step."""
     pred = np.asarray(pred)
@@ -54,7 +66,7 @@ def heading_error_deg(pred, rel_yaw) -> np.ndarray:
 class PolicyDriver:
     """The network flies; a scripted expert (no wander) labels every state it visits."""
 
-    def __init__(self, model, cfg, n_envs: int, label_wander_deg: float = 0.0):
+    def __init__(self, model, cfg, n_envs: int, label_wander_deg: float = 0.0, label_maneuvers: bool = True):
         from flybywire.vision.boxeye import BoxEye
         from flybywire.vision.flyvis_stepper import FlyvisStepper
 
@@ -72,6 +84,8 @@ class PolicyDriver:
         self.stepper.reset(n_envs)
         self.v = model.init_state(n_envs)
         self.label_cfg = OmegaConf.merge(cfg, {"expert": {"wander_deg": label_wander_deg}})
+        if not label_maneuvers:
+            self.label_cfg.expert.maneuvers = None
         self.experts = [None] * n_envs
 
     def start(self, j: int, seed: int, info: dict) -> None:

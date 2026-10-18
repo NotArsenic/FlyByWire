@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 """Does each EPG neuron's preferred heading in the trained network match its anatomical angle?
 
-The checkpoint runs over its validation episodes (from the T4/T5 cache, no flyvis). Per EPG
+The checkpoint runs over its validation episodes (from the cache it was trained on, no flyvis). Per EPG
 neuron the preferred heading phi comes from a least-squares fit of rate on [1, sin h, cos h]
 (h = true relative yaw), and separately from the heading decoder's weights. Both are compared
 with the anatomical angle theta from scripts/epg_anatomy.py using scores that ignore the unknown
 rotation and reflection of theta; p values shuffle neuron labels.
 
-Headings in the expert data are small, so cos h hardly varies and phi is poorly determined. This
+With the plain expert's small headings cos h hardly varies and phi is poorly determined. This
 script reports how poorly (bootstrap over episodes) next to the scores. A third score uses only
 the slope on sin h, which small headings do determine: if tuning is a bump at phi, the slope is
 proportional to sin(phi), so it should be a sinusoid of theta whatever the rotation.
 
 Usage:
-  python scripts/eval_topography.py [--ckpt runs/bc/real_s0/model.pt] [--cache data/cache]
+  python scripts/eval_topography.py [--ckpt runs/bc/real_s0/model.pt] [--cache DIR]
                                     [--angles data/flywire/processed/epg_eb_angles.npz] [--out DIR]
 """
 
@@ -30,7 +30,7 @@ from flybywire.clocks import clocks_from_cfg
 from flybywire.config import REPO_ROOT, data_dir
 from flybywire.connectome.masks import load_base_connectome
 from flybywire.data.cache import T4T5Cache
-from flybywire.eval.closed_loop import load_checkpoint
+from flybywire.eval.closed_loop import checkpoint_cache, load_checkpoint
 from flybywire.eval.topography import (
     abs_circ_corr,
     alignment,
@@ -170,7 +170,7 @@ def main(argv=None) -> int:
     ckpt = Path(args.ckpt)
     model, cfg = load_checkpoint(ckpt, device)
     clocks = clocks_from_cfg(cfg)
-    cache = T4T5Cache(args.cache or data_dir(cfg) / "cache")
+    cache = T4T5Cache(args.cache or checkpoint_cache(ckpt, cfg))
     data = BCData(cache, clocks)
     val = val_split(len(data), int(cfg.seed))
     anat = np.load(args.angles or data_dir(cfg) / "flywire" / "processed" / "epg_eb_angles.npz")
