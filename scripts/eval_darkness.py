@@ -36,23 +36,9 @@ from flybywire.config import REPO_ROOT
 from flybywire.data.cache import T4T5Cache
 from flybywire.data.trajectories import Trajectory
 from flybywire.eval.closed_loop import load_checkpoint
-from flybywire.eval.darkness import dark_branch, dark_series, dark_stats, snapshots
+from flybywire.eval.darkness import dark_branch, dark_series, dark_stats, grey_t4t5, snapshots
 from flybywire.eval.ring import model_layout
 from flybywire.train.bc import BCData
-
-
-def blank_t4t5(cfg, device) -> torch.Tensor:
-    """(8, 721) T4/T5 activity of the flyvis grey steady state."""
-    from flybywire.vision.flyvis_stepper import FlyvisStepper
-
-    stepper = FlyvisStepper(
-        model=cfg.vision.flyvis_model,
-        device=device,
-        dt=clocks_from_cfg(cfg).dt_sensory,
-        cell_types=tuple(cfg.vision.cell_types),
-        steady_state_seconds=float(cfg.vision.steady_state_seconds),
-    )
-    return stepper.readout(stepper.steady_state(1))[0].half().float()
 
 
 def plot(path: Path, taus, stats: dict, layout_label: str, title: str) -> None:
@@ -116,7 +102,7 @@ def main(argv=None) -> int:
     layout = model_layout(cfg, model, args.layout)
     t0s = [int(round(t * hz)) for t in args.t0]
     n_dark = int(round(args.dark_seconds * hz))
-    blank = blank_t4t5(cfg, device)
+    blank = grey_t4t5(cfg, device)
     with torch.no_grad():
         s_blank = model.sensory(blank[None])[0].cpu().numpy()
 

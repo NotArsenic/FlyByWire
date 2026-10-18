@@ -531,3 +531,32 @@ Topography of EPG activity vs EB angle is higher for real (0.50 vs 0.40, p 0.027
 uncorrected among six metrics and with the fixed readout pushing both masks toward alignment: a
 lead for another round, not a finding. Learned-readout topography per seed: alignment 0.12-0.25,
 |rho| <= 0.16, all p >= 0.10, real = rewired. scripts/sweep_stats.py, runs/sweep_turns/stats.json.
+
+## 2026-10-19 — D37. Darkness drift: grey is the wrong no-motion input
+
+The LPTC response to grey (forward and loom_left about +3.4) comes from the outer hexal rings.
+D14's baseline is mean relu(grey) over the 263 hexals with radius < 0.6 (rings 0-10), where grey
+relu is ~0.02 and cancels. Rings 13-15 (252 hexals) have grey relu up to 1.25, hold 35-58% of
+each template's squared weight and give ~94% of the forward and loom_left response. Textured
+frames held still give the same offset (within 0.1 of the real-data channel means), so the nets
+are trained around it; grey differs from a held frame by up to 0.9 real sd, also inside ring 12.
+A per-hexal static reference instead of the scalar baseline would be a constant shift per channel
+(pooling is linear after the relu) that InputProjection.bias absorbs exactly, so it can't change
+learning or drift. Not adopted.
+
+On grey the decoded heading drifts one way (11 of 12 runs turn right, mean -13.7 deg at 2 s,
+mean |drift| 24.9 deg). Holding the last real frame still gives +2.5 and 13.9 deg. The yaw channel
+alone explains little (swapping only yaw moves the drift 2.5 of 16 deg; lateral about half): the
+nets read rotation from the yaw, lateral and loom pattern together. So about half the grey drift
+is calibration, half state-dependent drift toward stable headings near 0 and +-85 deg (the
+training dwell headings), the same in all runs and both masks. Darkness tests should hold the last
+frame; D35's numbers are the grey case.
+
+EPG time constants (dt/alpha) are 22-67 ms median, 606 ms at most. With W = 0 the ring bump is
+gone within 50 ms, so persistence isn't single-neuron. W = 0 removes all synaptic drive (ER -> EPG
+too): the ~110 deg jump shows heading lives in coupled activity, not that an attractor holds it;
+a feed-forward chain would do the same. Scaling W by 0.9 or 1.1 doubles the 2 s drift and 1.25
+runs away, and the velocity field has stable points rather than a continuum: multi-stable at
+training headings, not a ring attractor. Real masks have shorter EPG and D7 time constants (34 vs
+54 and 34 vs 91 ms, n = 6 each, uncorrected p 0.03 and 0.002). scripts/diagnose_darkness.py,
+scripts/diagnose_lptc_grey.py, scripts/plot_time_constants.py, runs/darkness_diag.
