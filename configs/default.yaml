@@ -15,7 +15,7 @@ env:
   corridor: {length_m: 30, width_m: 3.0, height_m: 2.5}
   n_obstacles: 8
   wall_texture: none       # none | checker | noise
-  renderer: tiny           # auto | egl | tiny; EGL always draws shadow-map artefacts here (D29)
+  renderer: tiny           # auto | egl | tiny; EGL draws shadow-map artefacts here (D29)
 vision:
   backend: flyvis          # flyvis | farneback
   flyvis_model: flow/0000/000
@@ -31,14 +31,14 @@ connectome:
   mask_type: real          # real | rewire | er
   min_synapses: 5
   rewire_swaps_per_edge: 10
-  groups:                  # hemibrain-style patterns; VERIFY against the annotation table
+  groups:                  # glob patterns on the annotation table's type column
     ER:   ["ER*"]
     EPG:  ["EPG*"]
     PEN:  ["PEN*"]
     PEG:  ["PEG*"]
     D7:   ["Delta7*"]
     PFL3: ["PFL3*"]
-  flywire:                 # manual Codex download into data/flywire/raw/; VERIFY names against the files
+  flywire:                 # manual Codex download into data/flywire/raw/
     snapshot: 783
     connections_file: connections_princeton.csv
     annotations_file: consolidated_cell_types.csv
@@ -66,7 +66,7 @@ heads:
   ring_layout: auto        # anatomical | tuning | auto
 action:
   space: body_vel_yawrate  # [v_forward, v_lateral, v_vertical, yaw_rate]
-  limits:                  # initial values, tune in week 1
+  limits:                  # initial values
     v_forward: [0.0, 2.0]
     v_lateral: [-1.0, 1.0]
     v_vertical: [-0.5, 0.5]

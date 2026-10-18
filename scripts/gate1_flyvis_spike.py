@@ -5,15 +5,15 @@ Equivalence: 200 frames of drifting texture (160x160 -> BoxEye hexals) go throug
 stepper two ways, (a) one ``Network.forward`` call over the whole sequence and (b) frame by frame
 with carried state, in both stepper modes:
 
-  * ``public`` — ``Network.forward(x_t[:, None], dt, state=prev, as_states=True)[-1]``
-  * ``fast``   — parameters computed once, ``Network._next_state(params, state, x_t, dt)``
+  * ``public``: ``Network.forward(x_t[:, None], dt, state=prev, as_states=True)[-1]``
+  * ``fast``: parameters computed once, ``Network._next_state(params, state, x_t, dt)``
 
 A max |diff| / max |response| above 1e-5 is a failure. Throughput is timed at B = 1 and B = 12
 (50 warm-up + 500 timed steps, ``torch.cuda.synchronize()`` around the timing).
 
-PASS iff state carries correctly AND B = 12 reaches >= 100 batched steps/s in the default
-(``fast``) mode. Writes ``runs/gate1/report.json``. If it fails the script stops and reports;
-switching to the Farneback backend is the user's decision.
+Passes if state carries correctly and B = 12 reaches >= 100 batched steps/s in the default
+(``fast``) mode. Writes ``runs/gate1/report.json``. If it fails the script stops and reports; it
+never switches to the Farneback backend by itself.
 """
 
 from __future__ import annotations
@@ -135,7 +135,7 @@ def main(argv=None) -> int:
     print(f"RESULT: {report['result']}  (mode={used}, B=12 {b12:.1f} steps/s, need >= {MIN_STEPS_PER_S_B12})")
     print(f"wrote {out_dir / 'report.json'}")
     if not passed:
-        print("Gate 1 FAILED. Not switching backends automatically — decide whether to use vision.backend=farneback.")
+        print("Gate 1 FAILED. Not switching backends automatically (vision.backend=farneback is the fallback).")
     return 0 if passed else 1
 
 

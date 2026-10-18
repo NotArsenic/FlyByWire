@@ -1,8 +1,8 @@
 """Heading-decode metrics.
 
-* :func:`heading_r2` — R² computed **jointly** on (sin, cos):
-  ``1 - Σ‖pred - target‖² / Σ‖target - mean(target)‖²`` over all samples and both components.
-* :func:`angular_error_deg` — mean absolute wrapped angular error in degrees between
+* :func:`heading_r2`: R^2 computed jointly on (sin, cos),
+  ``1 - sum |pred - target|^2 / sum |target - mean(target)|^2`` over all samples and both components.
+* :func:`angular_error_deg`: mean absolute wrapped angular error in degrees between
   ``atan2(sin, cos)`` of prediction and target.
 """
 

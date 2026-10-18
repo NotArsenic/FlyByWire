@@ -1,18 +1,18 @@
-"""PPO fine-tuning from the BC policy (STUB — interfaces and docstrings only).
+"""PPO fine-tuning from the BC policy. Not implemented yet; this is the plan.
 
-Spec: section "Training / PPO". Written by hand: no RLlib, no SB3.
+Written by hand, no RLlib or SB3.
 
 Rollouts
     Synchronous, on-policy. ``ppo.n_envs`` (12) envs in ``AsyncVectorEnv(shared_memory=True,
     autoreset_mode=SAME_STEP)`` (see ``flybywire/envs/vec.py``). Envs return frames only; BoxEye,
     flyvis (:class:`~flybywire.vision.flyvis_stepper.FlyvisStepper`, batched B = n_envs) and the
-    core run in the main process on the GPU — one copy of the weights, no broadcast. Each
+    core run in the main process on the GPU, so there is one copy of the weights. Each
     rollout is ``ppo.rollout_decisions`` (128) decisions per env = 512 core steps.
 
 Recurrence
     Store the core state ``v`` (and flyvis state) at the start of each rollout; during the update,
     recompute the core through the whole rollout from that stored state. LPTC gradients need the
-    rollout's T4/T5 activity, so keep it on the GPU: 12 x 512 x 8 x 721 fp32 ≈ 140 MB.
+    rollout's T4/T5 activity, so keep it on the GPU: 12 x 512 x 8 x 721 fp32, ~140 MB.
 
 Episode boundaries
     When env i's episode ends (SAME_STEP autoreset: the returned obs already belongs to the new
@@ -37,7 +37,7 @@ import torch
 
 @dataclass
 class RolloutBuffer:
-    """Per-rollout storage, all on the GPU (STUB).
+    """Per-rollout storage, all on the GPU.
 
     Fields (n_envs = E, rollout decisions = K, core steps = 4K):
       t4t5 (E, 4K, 8, 721) fp32, actions (E, K, 4), logp (E, K), rewards (E, K), values (E, K),
@@ -59,25 +59,25 @@ def compute_gae(
     rewards: torch.Tensor, values: torch.Tensor, dones: torch.Tensor, last_value: torch.Tensor,
     gamma: float = 0.99, lam: float = 0.95,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Generalised advantage estimation over (E, K) tensors -> (advantages, returns) (STUB)."""
-    raise NotImplementedError("PPO phase: GAE (spec 'PPO / Hyperparameters')")
+    """GAE over (E, K) tensors -> (advantages, returns)."""
+    raise NotImplementedError("PPO is not implemented yet")
 
 
 def kl_anchor_beta(update: int, beta0: float = 0.1, decay_updates: int = 50) -> float:
-    """Linearly decaying KL-anchor weight (STUB)."""
-    raise NotImplementedError("PPO phase: KL anchor (spec 'Protecting the BC initialization')")
+    """KL-anchor weight, decaying linearly to 0."""
+    raise NotImplementedError("PPO is not implemented yet")
 
 
 def collect_rollout(model, stepper, boxeye, vec_env, n_decisions: int, state: dict) -> RolloutBuffer:
-    """Run ``n_decisions`` synchronous decisions in all envs, handling per-env resets (STUB)."""
-    raise NotImplementedError("PPO phase: rollouts (spec 'PPO / Rollouts', 'Episode boundaries')")
+    """Run ``n_decisions`` decisions in all envs, resetting state per env at episode ends."""
+    raise NotImplementedError("PPO is not implemented yet")
 
 
 def ppo_update(model, bc_policy, buffer: RolloutBuffer, optimizers: dict, cfg, update: int) -> dict:
-    """Recompute the core through the rollout and apply clipped-PPO + KL-anchor + aux loss (STUB)."""
-    raise NotImplementedError("PPO phase: update (spec 'PPO / Recurrence', 'Hyperparameters')")
+    """Recompute the core through the rollout; clipped PPO + KL anchor + aux heading loss."""
+    raise NotImplementedError("PPO is not implemented yet")
 
 
 def train_ppo(cfg, bc_checkpoint: str, out_dir: str) -> dict:
-    """Full PPO loop: critic warm-up, rollouts, updates, logging, checkpoints (STUB)."""
-    raise NotImplementedError("PPO phase (spec 'Training / PPO')")
+    """Critic warm-up, rollouts, updates, logging, checkpoints."""
+    raise NotImplementedError("PPO is not implemented yet")

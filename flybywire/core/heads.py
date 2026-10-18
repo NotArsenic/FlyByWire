@@ -1,11 +1,11 @@
 """Input projection and readout heads.
 
-* :class:`InputProjection` — (B, 8) LPTC channels -> (B, N); nonzero only on ER neurons (inv. 3).
-* :class:`HeadingDecoder` — Linear(|EPG| -> 2), (sin, cos) of heading relative to episode start.
+* :class:`InputProjection`: (B, 8) LPTC channels -> (B, N); nonzero only on ER neurons (inv. 3).
+* :class:`HeadingDecoder`: Linear(|EPG| -> 2), (sin, cos) of heading relative to episode start.
   Auxiliary only; never feeds the actor. Reads only EPG rates (inv. 4).
-* :class:`Actor` — Linear(|PFL3| -> 4) + tanh mean, state-independent ``log_std`` (init -1.5).
+* :class:`Actor`: Linear(|PFL3| -> 4) + tanh mean, state-independent ``log_std`` (init -1.5).
   Linear on purpose: "steering is a linear readout of PFL3". Reads only PFL3 rates (inv. 4).
-* :class:`Critic` — small MLP on ``r.detach()``; never backpropagates into the core (inv. 4).
+* :class:`Critic`: small MLP on ``r.detach()``; never backpropagates into the core (inv. 4).
 """
 
 from __future__ import annotations

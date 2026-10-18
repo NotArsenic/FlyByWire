@@ -1,10 +1,10 @@
 """LPTCPool: T4/T5 activity (B, 8, 721) -> 8 self-motion channels (B, 8).
 
-Template weights ``w[k, d, p] = f_k(p) · e_d`` (flow field of channel k at hexal p, projected on
+Template weights ``w[k, d, p] = dot(f_k(p), e_d)`` (flow field of channel k at hexal p, projected on
 the calibrated preferred direction of subtype d), each template normalised to unit L2 norm over
-(d, p). Output ``s_k = Σ_d Σ_p g[k, d] * w[k, d, p] * T_d(p)``.
+(d, p). Output ``s_k = sum over d, p of g[k, d] * w[k, d, p] * T_d(p)``.
 
-Input transform: ``T_d(p) = relu(activity) - baseline_d`` — the rectified (synaptic-output)
+Input transform: ``T_d(p) = relu(activity) - baseline_d``, the rectified (synaptic-output)
 activity, minus its grey-steady-state level so that a static scene gives ~0 (docs/DECISIONS.md).
 
 Modes: ``frozen`` (g = 1 fixed), ``gains`` (g learnable, 64 params, default), ``full`` (w learnable,

@@ -16,10 +16,10 @@ API facts verified in the installed flyvis 1.2.0 source (``flyvis/network/networ
   (membrane voltage; edges carry no state). We therefore keep only that tensor and rebuild the
   state namespace with ``Network._state_api`` each step.
 * Photoreceptor input: the stimulus buffer is ``(B, T, n_nodes)``; hexal input ``(B, 721)`` is
-  written to ``stimulus.input_index`` (R1–R8, shape (8, 721)), broadcast over the 8 types.
+  written to ``stimulus.input_index`` (R1-R8, shape (8, 721)), broadcast over the 8 types.
 * ``Network.steady_state(t_pre, dt, batch_size, value=0.5)`` integrates a uniform grey stimulus.
 
-Outputs are the raw ``activity`` (voltage) of T4a–d / T5a–d, shape ``(B, 8, 721)``, in the
+Outputs are the raw ``activity`` (voltage) of T4a-d / T5a-d, shape ``(B, 8, 721)``, in the
 ``get_hex_coords(15)`` hexal order (same order as BoxEye output).
 """
 

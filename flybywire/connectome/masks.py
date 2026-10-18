@@ -1,4 +1,4 @@
-"""Mask conditions: ``real``, ``rewire`` (directed degree-preserving) and ``er`` (Erdős–Rényi).
+"""Mask conditions: ``real``, ``rewire`` (directed degree-preserving) and ``er`` (Erdos-Renyi).
 
 All conditions share the same N, neuron order and cell-type index sets; only the edges differ
 (invariant 7).

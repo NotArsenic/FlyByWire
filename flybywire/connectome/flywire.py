@@ -31,7 +31,7 @@ def _read_table(path: Path, needed: dict[str, str], what: str) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(
             f"{what} table not found: {path}\n"
-            "Download it from FlyWire Codex (snapshot 783) into data/flywire/raw/ — see README 'Data'."
+            "Download it from FlyWire Codex (snapshot 783) into data/flywire/raw/; see README 'Data'."
         )
     suffixes = "".join(path.suffixes).lower()
     if ".parquet" in suffixes:
@@ -129,7 +129,7 @@ def load_flywire_cx(cfg, raw_dir: Path, verbose: bool = True) -> Connectome:
         print(f"\nN = {conn.n}   edges = {conn.n_edges}   density = {conn.density:.4f}")
         empty = [g for g, idx in groups.items() if len(idx) == 0]
         if empty:
-            print(f"WARNING: groups with no neurons: {empty} — check the patterns against the annotation table")
+            print(f"WARNING: groups with no neurons: {empty}; check the patterns against the annotation table")
     return conn
 
 

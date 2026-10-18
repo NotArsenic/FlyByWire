@@ -42,10 +42,10 @@ def calibrate(cfg, device: str | None = None) -> dict:
 
 
 def print_table(dm: dict) -> None:
-    print(f"\n{'subtype':<8} {'dx':>7} {'dy':>7} {'angle':>8} {'DSI':>6}   R(+x)   R(-x)   R(+y)   R(-y)")
+    print(f"\n{'subtype':<8} {'dx':>7} {'dy':>7} {'deg':>8} {'DSI':>6}   R(+x)   R(-x)   R(+y)   R(-y)")
     for t, s in dm["subtypes"].items():
         r = s["responses"]
-        print(f"{t:<8} {s['direction'][0]:>7.3f} {s['direction'][1]:>7.3f} {s['angle_deg']:>7.1f}° "
+        print(f"{t:<8} {s['direction'][0]:>7.3f} {s['direction'][1]:>7.3f} {s['angle_deg']:>8.1f} "
               f"{s['dsi']:>6.3f}  {r['+x']:.4f}  {r['-x']:.4f}  {r['+y']:.4f}  {r['-y']:.4f}")
     print("(image coordinates: x right, y down; angle = atan2(dy, dx))")
 

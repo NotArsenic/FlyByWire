@@ -1,4 +1,4 @@
-"""One test (or more) per architecture invariant (numbering follows AGENTS.md / the spec)."""
+"""At least one test per architecture invariant (numbered as in AGENTS.md)."""
 
 from __future__ import annotations
 
@@ -163,7 +163,7 @@ def test_inv9_heading_target_relative_to_start():
     assert np.allclose(rel, expected)
     assert np.all((rel >= -np.pi) & (rel < np.pi))
     assert np.isclose(rel[0], 0.0) and np.isclose(rel[-1], 0.0, atol=1e-9)
-    assert np.isclose(rel[2], (-3.1 - 3.0) + 2 * np.pi)  # wraps across ±pi
+    assert np.isclose(rel[2], (-3.1 - 3.0) + 2 * np.pi)  # wraps across +/-pi
     tgt = heading_target(rel)
     assert tgt.shape == (5, 2)
     assert np.allclose(tgt[:, 0], np.sin(rel)) and np.allclose(tgt[:, 1], np.cos(rel))

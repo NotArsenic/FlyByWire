@@ -2,7 +2,7 @@
 
 Computes dense optical flow between consecutive frames with OpenCV's Farneback method and projects
 it onto the same 8 self-motion flow templates used by the LPTC layer, evaluated on the pixel grid:
-``s_k = <f̂_k, flow>`` with ``f̂_k`` the unit-L2-norm template. Output is ``(B, 8)`` directly, so
+``s_k = <f_k, flow>`` with ``f_k`` the template scaled to unit L2 norm. Output is ``(B, 8)`` directly, so
 everything downstream (InputProjection, core, heads) is unchanged. Stateful per env (previous
 frame); there is nothing to learn and no gradient.
 

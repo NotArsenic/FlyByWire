@@ -1,1 +1,1 @@
-"""Training: behavior cloning (implemented), PPO (stub), and the mask-condition sweep."""
+"""Training: behavior cloning, PPO (not implemented yet) and the mask-condition sweep."""

@@ -1,12 +1,12 @@
 """T4/T5 activity cache: ``data/cache/{t4t5_fp16.npy, offsets.npy, manifest.json}``.
 
-* ``t4t5_fp16.npy`` — memmap ``(total_T, 8, 721)`` float16, trajectories concatenated in manifest
+* ``t4t5_fp16.npy``: memmap ``(total_T, 8, 721)`` float16, trajectories concatenated in manifest
   order; episode ``i`` occupies rows ``offsets[i]:offsets[i + 1]``.
-* ``offsets.npy`` — ``(n_traj + 1,)`` int64.
-* ``manifest.json`` — flyvis model id, dt, cell types, config hash, trajectory file list.
+* ``offsets.npy``: ``(n_traj + 1,)`` int64.
+* ``manifest.json``: flyvis model id, dt, cell types, config hash, trajectory file list.
 
 The builder runs a stepper (normally :class:`~flybywire.vision.flyvis_stepper.FlyvisStepper`) over
-batches of 10–20 trajectories, initialised from the grey steady state, slicing out T4/T5 at every
+batches of 10-20 trajectories, initialised from the grey steady state, slicing out T4/T5 at every
 step (full 45,669-cell responses are never held). Shorter trajectories in a batch are padded
 with grey after their end; padded outputs are discarded. One cache serves every mask condition
 and seed. BC reads only this cache and never runs flyvis.

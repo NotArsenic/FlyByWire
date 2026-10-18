@@ -1,10 +1,10 @@
 """Synthetic visual stimuli for plumbing tests, Gate 1 and direction calibration.
 
-* :func:`panorama_texture` + :func:`view_from_panorama` — a cylindrical random texture viewed
+* :func:`panorama_texture` + :func:`view_from_panorama`: a cylindrical random texture viewed
   through a ``fov_deg`` window; rotating the viewer by ``yaw`` shifts the texture horizontally.
   Positive yaw (turning left, body +z) moves the scene **rightward** in the image, matching the
   sign of the ``yaw`` flow template in :mod:`flybywire.vision.flowfields`.
-* :func:`square_grating` — drifting square-wave grating moving along +x / -x / +y / -y (image
+* :func:`square_grating`: drifting square-wave grating moving along +x / -x / +y / -y (image
   coordinates, x right, y down).
 
 All frames are float32 in [0, 1], shape (H, W).
@@ -23,7 +23,7 @@ def px_per_rad(size: int, fov_deg: float) -> float:
 
 
 def panorama_texture(size: int = 160, fov_deg: float = 110.0, seed: int = 0, sigma_px: float = 3.0) -> np.ndarray:
-    """(size, W360) float32 [0, 1] random texture covering 360° horizontally (wraps)."""
+    """(size, W360) float32 [0, 1] random texture covering 360 deg horizontally (wraps)."""
     rng = np.random.default_rng(seed)
     width = int(round(2 * np.pi * px_per_rad(size, fov_deg)))
     noise = rng.random((size, width)).astype(np.float32)

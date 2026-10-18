@@ -24,7 +24,7 @@ def keep_mask(n: int, groups: Mapping[str, np.ndarray], names: Iterable[str]) ->
 
 @contextmanager
 def lesioned(model, names: Iterable[str]):
-    """``with lesioned(model, ["EPG"]): ...`` — lesion inside the block, restore afterwards."""
+    """``with lesioned(model, ["EPG"]): ...`` lesions inside the block and restores afterwards."""
     prev = model.core.keep.clone()
     model.lesion(list(names))
     try:

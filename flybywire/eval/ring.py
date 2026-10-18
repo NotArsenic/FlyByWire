@@ -2,12 +2,12 @@
 
 Layout modes (``heads.ring_layout``):
 
-* ``anatomical`` — parse the protocerebral-bridge glomerulus from instance names
+* ``anatomical``: parse the protocerebral-bridge glomerulus from instance names
   (:func:`~flybywire.connectome.celltypes.parse_pb_glomerulus`) and map it to a wedge
   (:func:`~flybywire.connectome.celltypes.pb_glomerulus_to_wedge`, approximate convention).
-* ``tuning`` — each EPG neuron gets the angle ``atan2`` of its heading-decoder weights
+* ``tuning``: each EPG neuron gets the angle ``atan2`` of its heading-decoder weights
   ``(w_sin, w_cos)``, binned into 16 wedges.
-* ``auto`` — anatomical if parsing succeeds for >= 90% of EPG neurons, else tuning.
+* ``auto``: anatomical if parsing succeeds for >= 90% of EPG neurons, else tuning.
 
 The figure always states the layout that was used.
 """

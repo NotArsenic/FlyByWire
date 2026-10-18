@@ -1,11 +1,11 @@
 """Ego-motion optic-flow templates (Longuet-Higgins & Prazdny 1980) at hexal / pixel positions.
 
 Image coordinates (focal-length units): ``x`` right, ``y`` down; the optical axis is ``Z``
-(forward). For a camera translating with ``T`` and rotating with ``Ω`` (camera frame) past a
+(forward). For a camera translating with ``T`` and rotating with ``W`` (camera frame) past a
 static point at depth ``Z``, the image flow is::
 
-    u = (-Tx + x Tz) / Z + Ωx x y - Ωy (1 + x²) + Ωz y
-    v = (-Ty + y Tz) / Z + Ωx (1 + y²) - Ωy x y - Ωz x
+    u = (-Tx + x Tz) / Z + Wx x y - Wy (1 + x^2) + Wz y
+    v = (-Ty + y Tz) / Z + Wx (1 + y^2) - Wy x y - Wz x
 
 Translation templates assume unit depth (``Z = 1``).
 

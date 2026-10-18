@@ -5,7 +5,7 @@
         --HeadingDecoder (EPG, every core step) / Actor (PFL3, decision steps, 25 Hz) / Critic (r.detach())
 
 With the Farneback backend (``lptc=None``) the input is already ``(B, 8)``.
-Decision timing comes from :class:`flybywire.clocks.Clocks` — a decision is read out after core
+Decision timing comes from :class:`flybywire.clocks.Clocks`: a decision is read out after core
 step ``t`` iff ``clocks.is_decision_step(t)`` (global step index).
 """
 
