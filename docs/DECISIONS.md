@@ -506,3 +506,28 @@ In darkness the trained recurrence holds the decoded heading with a leak: drift 
 and 16-42 deg at 2 s, against ~110 deg with recurrent weights zeroed. Anatomical-readout runs fly
 worse and very unevenly in closed loop (0.06 to 0.62 per run, SE 0.07) at the same open-loop
 action MSE; not explained.
+
+## 2026-10-19 — D36. Real vs rewired at n = 10; bump share definition
+
+Protocol fixed before training (runs/sweep_turns/PROTOCOL.md, 2026-10-18 23:29; copied to
+docs/protocols/sweep_turns_n10.md): anatomical readout, seeds 0-9 per mask, primary metric Gate 3
+bump share on data/cache_turns_test, difference of means, exact two-sided permutation over all
+C(20,10) relabelings, and seeds 3-9 alone as the replication subset since seeds 0-2 produced the
+hypothesis. Seeds 3-9 used identical config and data (14 runs, 12 min each, 3 in parallel).
+
+Share = |P1|^2 / sum_{k=1..8} |Pk|^2 on the 16 wedge means; the mean isn't in the denominator, so a
+uniform floor can't change it (checked, < 1e-15). The trained cores' floor is ~0.03-0.06 (5th
+percentile rate), not softplus(0). A perfect bump with that floor and the measured height reaches
+0.5 at FWHM 52.7 deg, same as with no floor, so the threshold is reachable and no corrected metric
+is used; a resting-rate-subtracted share is reported alongside. 0.34 is an ideal bump of ~35 deg,
+0.19 ~15 deg. The metric isn't monotone at the narrow end: a one-wedge spike and noise both score
+~0.13-0.28. scripts/bump_sharpness_check.py, runs/bump_check.
+
+Bump share real 0.299 +/- 0.070, rewired 0.239 +/- 0.046, p 0.030 on all 20, but the seed 0-2
+lead (0.337 vs 0.190) doesn't replicate: seeds 3-9 give 0.283 vs 0.260, p 0.37 (resting-rate
+version the same). The pooled p leans on the seeds that produced the hypothesis, so it is not a
+result. No run passes Gate 3 (best 0.449). R^2 and ring alignment don't separate the masks.
+Topography of EPG activity vs EB angle is higher for real (0.50 vs 0.40, p 0.027 all, 0.036 fresh),
+uncorrected among six metrics and with the fixed readout pushing both masks toward alignment: a
+lead for another round, not a finding. Learned-readout topography per seed: alignment 0.12-0.25,
+|rho| <= 0.16, all p >= 0.10, real = rewired. scripts/sweep_stats.py, runs/sweep_turns/stats.json.

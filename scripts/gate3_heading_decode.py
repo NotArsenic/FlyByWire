@@ -12,6 +12,10 @@ on). Three conditions, all required, fixed before any result was looked at:
      at s * heading + c for fixed c and s = +/-1. The report also gives a null, the alignment when
      each episode's bump is paired with another episode's heading.
 
+The anatomical ring entry also carries ``fraction_mean_floor_subtracted``: the same share after each
+neuron's resting rate (its 5th percentile over the scored frames) is taken off. It is a check on
+the threshold's reachability (runs/bump_check), not a second gate.
+
 Conditions 2 and 3 are scored on the anatomical layout (EPG neurons binned by their angle around
 the ellipsoid body). The tuning layout (neurons binned by their decoder weights) is reported as a
 labelled reference only: the decoder is trained to read heading from those neurons, so it shows a
@@ -38,7 +42,7 @@ from flybywire.config import REPO_ROOT
 from flybywire.data.cache import T4T5Cache
 from flybywire.eval.closed_loop import load_checkpoint
 from flybywire.eval.metrics import angular_error_deg, heading_r2
-from flybywire.eval.ring import bump, model_layout, ring_activity, ring_tracking
+from flybywire.eval.ring import bump, model_layout, rate_floor, ring_activity, ring_tracking
 from flybywire.train.bc import BCData
 
 MIN_R2 = 0.8
@@ -126,8 +130,11 @@ def main(argv=None) -> int:
         profile = [ring_activity(r, layout) for r in rates]
         bumps = [bump(p) for p in profile]
         panels.append({"label": f"{layout.label} ({role})", "profile": profile, "bumps": bumps, "mode": mode,
-                       "report": ring_tracking(bumps, heading, WASHOUT)})
+                       "layout": layout, "report": ring_tracking(bumps, heading, WASHOUT)})
     anat = panels[0]["report"]
+    floor = rate_floor(rates, WASHOUT)
+    resting = [bump(ring_activity(r - floor, panels[0]["layout"]))["fraction"][WASHOUT:] for r in rates]
+    anat["fraction_mean_floor_subtracted"] = float(np.concatenate(resting).mean())
     checks = {
         "heading_r2": {"value": decode["r2"], "threshold": MIN_R2, "pass": decode["r2"] > MIN_R2},
         "single_bump": {"value": anat["fraction_mean"], "threshold": MIN_FRACTION,
@@ -153,6 +160,7 @@ def main(argv=None) -> int:
 
     for k, c in checks.items():
         print(f"{k:22s} {c['value']:.3f}  (> {c['threshold']})  {'pass' if c['pass'] else 'FAIL'}")
+    print(f"share with resting rates subtracted: {anat['fraction_mean_floor_subtracted']:.3f}")
     ref = report["ring"]["tuning"]
     print(f"reference, tuning layout: fraction {ref['fraction_mean']:.3f}, alignment {ref['alignment']:.3f}")
     print(f"Gate 3 {'PASS' if report['pass'] else 'FAIL'}; wrote {out_dir / 'report.json'}")

@@ -5,7 +5,8 @@ Launches ``python -m flybywire.train.bc`` once per (condition, decoder, seed) fr
 time, each writing to ``<out>/<condition>_<decoder>_s<seed>/`` (default out: ``<runs_dir>/sweep``)
 with its stdout/stderr in ``train.log``. With ``--resume`` a run whose directory already has a
 ``metrics.json`` is not trained again. When all finish, collects every ``metrics.json`` into
-``<out>/summary.json``. The comparison runs in the BC regime only (docs/DECISIONS.md D7).
+``<out>/summary.json``; rows of runs this call doesn't cover (an earlier sweep into the same
+directory) stay. The comparison runs in the BC regime only (docs/DECISIONS.md D7).
 
 CLI::
 
@@ -69,8 +70,13 @@ def summarize(jobs: list[dict], out_root: Path) -> dict:
         m = job["out"] / "metrics.json"
         rows.append({"condition": job["condition"], "decoder": job["decoder"], "seed": job["seed"],
                      "returncode": job.get("returncode"), **(json.loads(m.read_text()) if m.exists() else {})})
+    path = out_root / "summary.json"
+    if path.exists():
+        new = {(r["condition"], r["decoder"], r["seed"]) for r in rows}
+        kept = [r for r in json.loads(path.read_text())["runs"] if (r["condition"], r["decoder"], r["seed"]) not in new]
+        rows = kept + rows
     summary = {"runs": rows}
-    (out_root / "summary.json").write_text(json.dumps(summary, indent=2))
+    path.write_text(json.dumps(summary, indent=2))
     return summary
 
 

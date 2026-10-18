@@ -81,13 +81,23 @@ def ring_activity(r_epg, layout: RingLayout) -> np.ndarray:
     return out
 
 
+def rate_floor(rates, washout: int = 0, q: float = 5.0) -> np.ndarray:
+    """Resting rate per neuron: the q-th percentile of its rate over all frames after the washout.
+
+    rates: one (T, n_epg) array per episode. Subtract it before ``ring_activity`` to see whether
+    a neuron's baseline, rather than the bump, sets the share.
+    """
+    return np.percentile(np.concatenate([r[washout:] for r in rates]), q, axis=0)
+
+
 def bump(profile) -> dict[str, np.ndarray]:
     """Single-bump summary of ring profiles (..., n_wedges), from the first Fourier component.
 
     ``angle`` is the population-vector angle, wedge w centred at (w + 0.5) 2 pi / n_wedges.
     ``size`` is the length of that vector (same unit as the profile, not normalised).
     ``fraction`` is the share of the power in harmonics 1..n/2 that sits in harmonic 1: 1 for a
-    pure cosine, about 1/8 for noise, 0 for a flat profile.
+    pure cosine, about 1/8 for noise, 0 for a flat profile. The mean (harmonic 0) is left out of
+    the denominator, so adding the same rate to every wedge doesn't change it.
     """
     p = np.asarray(profile, dtype=np.float64)
     p = np.where(np.isnan(p), np.nanmean(p, axis=-1, keepdims=True), p)  # an empty wedge adds no bump

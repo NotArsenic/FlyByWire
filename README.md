@@ -184,19 +184,21 @@ docs/DECISIONS.md           dated decisions and every deviation from the spec
 
 ## Results
 
-BC on 1000 turning-expert episodes, scored on 100 held-out episodes; mean ± sd over seeds 0, 1, 2
-(`runs/sweep_turns/results.json`, D35). "learned" is the free 2 × 51 heading readout, "anatomical"
-the fixed population vector over EPG EB angles. Bump share and alignment are on the anatomical ring.
+BC on 1000 turning-expert episodes, scored on 100 held-out episodes; mean ± sd over seeds
+(D35, D36). "learned" is the free 2 × 51 heading readout, "anatomical" the fixed population vector
+over EPG EB angles. Bump share is on the anatomical ring (0.5 ≈ a 53° FWHM bump, 0.3 ≈ 30°).
 
-| Mask / readout | Heading R² | Angular error | Action MSE | Bump share | Closed-loop success |
+| Mask / readout | Seeds | Heading R² | Angular error | Bump share | Closed-loop success (seeds 0-2) |
 |---|---|---|---|---|---|
-| real / learned | 0.973 ± 0.002 | 4.70° | 0.020 | 0.17 ± 0.03 | 0.56 ± 0.06 |
-| rewire / learned | 0.968 ± 0.004 | 5.16° | 0.020 | 0.15 ± 0.07 | 0.57 ± 0.04 |
-| real / anatomical | 0.974 ± 0.001 | 4.57° | 0.019 | 0.34 ± 0.10 | 0.25 ± 0.32 |
-| rewire / anatomical | 0.973 ± 0.003 | 4.78° | 0.019 | 0.19 ± 0.02 | 0.39 ± 0.20 |
+| real / learned | 0-2 | 0.973 ± 0.002 | 4.70° | 0.17 ± 0.03 | 0.56 ± 0.06 |
+| rewire / learned | 0-2 | 0.968 ± 0.004 | 5.16° | 0.15 ± 0.07 | 0.57 ± 0.04 |
+| real / anatomical | 0-9 | 0.973 | 4.64° | 0.30 ± 0.07 | 0.25 ± 0.32 |
+| rewire / anatomical | 0-9 | 0.973 | 4.78° | 0.24 ± 0.05 | 0.39 ± 0.20 |
 
-Only the bump share under the anatomical readout separates real from rewired wiring beyond seed
-spread, and it stays below Gate 3's 0.5. The expert flies 100% of the closed-loop episodes.
+With the anatomical readout, real wiring gave a sharper bump on seeds 0-2 (0.34 vs 0.19), but that
+did not replicate on seeds 3-9 (0.28 vs 0.26, exact permutation p 0.37; protocol fixed in advance,
+`docs/protocols/sweep_turns_n10.md`). No run reaches Gate 3's 0.5. The expert flies 100% of the
+closed-loop episodes.
 
 Figures (placeholders): real vs. rewired adjacency; ring bump vs. heading; heading decode per
 condition; lesion effects; BC → PPO success rate.
