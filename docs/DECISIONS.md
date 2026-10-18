@@ -324,3 +324,67 @@ generated from lod 1 meshes and 2x downsampled. Columns: `node_id`, `parent_id`,
 
 All 457 neurons in `cx_graph.npz` are present (1,137,123 nodes in total, 1,068 to 6,895 per
 neuron), so only a small subset needs reading. Not used by any code yet.
+
+---
+
+## Environment and expert data
+
+## 2026-10-18 — D29. Corridor env, scripted expert and vec env
+
+**Env.** `BaseAviary` (CF2X, `Physics.PYB`) with `pyb_freq = ctrl_freq = 200`, so one aviary step
+is one physics step, and `DSLPIDControl` every physics step. Velocity tracking as in the library's
+`VelocityAviary` (`target_pos` = current position, command in `target_vel`). Target yaw integrates
+`yaw_rate`, which is also passed as the yaw entry of `target_rpy_rates`. Body velocity is rotated
+into the world by the current yaw. A 1 rad/s yaw-rate command is tracked within 0.1 rad/s.
+
+Scene: corridor along world +x (x 0-30 m, y +/-1.5 m, z 0-2.5 m) with walls, ceiling and end walls;
+the floor is pybullet's `plane.urdf` checker. Eight floor-to-ceiling obstacles, cylinders
+(r 0.15-0.3 m) or boxes (half sizes 0.15-0.35 m), evenly spaced from x = 4 to 28 m with +/-0.5 m
+jitter, centres within 0.7 m of the axis. Start at x = 1 m, y +/-0.3 m, z 1.0-1.4 m, yaw 0, so
+`yaw_0` is the corridor axis. Any contact point (floor included) is a collision. x >= 29 m or
+leaving the box also ends the episode. The progress reward is in m/s (dx * control_hz): as
+distance per decision (~0.05 m) the heading term would dominate and hovering would pay.
+
+**TinyRenderer by default (`env.renderer: tiny`) [deviation].** The spec says EGL first. In DIRECT
+mode the EGL plugin always draws shadow maps; `shadow=0`, `COV_ENABLE_SHADOWS` and
+`shadowMapIntensity` change nothing (identical pixels). In a closed corridor that means shadow
+acne (moire) on walls lit at grazing angles and big shadow-boundary patches, and both move with
+the camera: image motion that isn't ego-motion. TinyRenderer with `shadow=0` is clean but costs
+8.6 ms per frame vs 1.7 ms, ~35 ms per decision, ~9 s per episode. `auto` still tries EGL first.
+Every body also gets an explicit texture, since OpenGL otherwise puts a fine checker on
+primitives that aliases at a distance.
+
+**Expert** (new `expert:` config section **[config addition]**). Potential field: pull toward a
+point 3 m down the centre line, or, when the nearest obstacle within 3 m blocks the centre (half
+width + 0.45 m), toward the middle of the wider gap beside it at the obstacle's x; push from
+obstacle and wall surfaces within 0.6 m. Field direction plus a seeded OU wander (sd 8 deg,
+tau 1 s) gives the desired heading (max 45 deg), tracked by a heading PID (2.5, 0.2, 0.15). Speed
+1.5 m/s along that heading, down to 40% near obstacles; altitude held. Without the wander every
+dodge looked the same. Seeds 0-299, dynamics only: 300/300 full episodes, no collisions, mean
+progress 11.9 m (about 4 of the 8 obstacles), yaw-rate sd 0.36 rad/s, mean peak |rel_yaw| 32 deg.
+No episode reaches the corridor end in 10 s at this speed.
+
+**Trajectories.** Window k (window 0 = reset pre-roll) is decision k's input. The window returned
+by the final step has no decision and is dropped, so T = 4K in every file.
+
+**Vec env.** `AsyncVectorEnv(shared_memory=True, context="spawn", autoreset_mode=SAME_STEP)`.
+Spawned so workers don't inherit the main process's CUDA context.
+
+## 2026-10-18 — D30. Expert data, T4/T5 cache, Gate 2: PASS
+
+`make collect`: seeds 0-299, `wall_texture: none`, TinyRenderer, 12 workers, 422 s. All 300
+episodes ran 250 decisions (T = 1000) without a collision; mean progress 11.9 m. 127 MB of
+trajectories (the README guessed ~0.5 GB; flat walls compress well) and 18 MB of raw frames for
+episodes 0-19. `make cache`: 300,000 x 8 x 721 fp16, 3.46 GB, 53 s.
+
+Gate 2 (`runs/gate2/report.json`): ridge from all 5,768 T4/T5 voltages at frame t to body yaw rate
+at frame t. Split by trajectory 210 / 30 / 60 (train / validation / test, seed 0), first 50 frames
+per episode dropped (onset transient from the grey steady state), penalty picked on validation
+(3e-3 per sample, inside the grid), refit on train + validation. **Test R^2 = 0.787** on 57,000
+held-out frames (train + validation 0.823). Pooled 4 x 4 grid per subtype (128 features): 0.741.
+Passes with untextured walls, so the checker / noise fallback isn't needed.
+
+Not part of the gate: shifting the target against the features (pooled, same split) gives R^2
+0.68 at -40 ms, 0.75 at 0, 0.84 at +40 ms, a peak of 0.89 at +80 ms and 0.88 at +120 ms. T4/T5
+activity reflects the yaw rate of ~80 ms earlier, which is the right sign for a sensory delay (a
+flipped alignment would peak at negative lags). The core will get yaw rate ~80 ms late.

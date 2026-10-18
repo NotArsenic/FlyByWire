@@ -6,7 +6,8 @@ model of the fly optic lobe feeding a recurrent network wired like the FlyWire c
 <!-- Demo: lesion video (scripts/render_lesion_video.py) goes here once available, e.g.
 <p align="center"><img src="docs/media/lesion_demo.gif" width="720"></p> -->
 
-> **Status:** scaffolding. Environment, PPO, dashboard and video are stubs; no results yet.
+> **Status:** corridor env, scripted expert, expert data and T4/T5 cache are done; Gates 1 and 2 pass.
+> PPO, dashboard and video are stubs; nothing has been trained yet.
 
 ## What is reused vs. built
 
@@ -133,8 +134,8 @@ al., 2024). Downloading may require signing in to FlyWire Codex and accepting it
 | conda env | 8–12 GB |
 | flyvis pretrained models | 10 MB download (measured); 111 MB after first use (flyvis builds a 101 MB connectome cache) |
 | FlyWire tables | up to ~2 GB |
-| expert trajectories (300 × hexals fp16) | ~0.5 GB |
-| T4/T5 cache (300 × 1000 × 8 × 721 fp16) | ~3.5 GB |
+| expert trajectories (300 × hexals fp16) | 127 MB measured (+ 18 MB raw frames for 20 episodes) |
+| T4/T5 cache (300 × 1000 × 8 × 721 fp16) | 3.46 GB measured |
 | logs, checkpoints, videos | 2–5 GB |
 | **total** | **~20–30 GB; keep 50 GB free** |
 
@@ -146,6 +147,9 @@ make test        # pytest; GPU, flyvis and FlyWire-graph tests skip with a reaso
 make smoke       # end-to-end plumbing run on synthetic trajectories + the FlyWire graph (~20 s). NOT a result.
 make gate1       # flyvis state-carry equivalence + throughput -> runs/gate1/report.json
 make calibrate   # T4/T5 preferred directions -> data/flyvis/direction_map.json
+make collect     # 300 scripted-expert episodes -> data/expert (hexals, actions, state; ~7 min)
+make cache       # frozen flyvis over the stored hexals -> data/cache T4/T5 memmap (3.5 GB, ~1 min)
+make gate2       # ridge T4/T5 -> yaw rate on held-out trajectories -> runs/gate2/report.json
 make params      # effective trainable parameters (W counted on-mask only)
 ```
 
@@ -154,7 +158,7 @@ make params      # effective trainable parameters (W counted on-mask only)
 | Gate | Question | Pass criterion | Status |
 |---|---|---|---|
 | 1 | Can frozen flyvis be stepped frame by frame with carried state, fast enough? | (a) one call vs. (b) per-frame with state agree to ≤ 1e-5 relative, **and** ≥ 100 batched steps/s at B = 12 | **PASS** (2.7e-7; 634 steps/s) |
-| 2 | Is yaw rate linearly decodable from T4/T5 in the corridor? | ridge regression T4/T5 → yaw rate on held-out trajectories, R² > 0.5 | pending (week 1) |
+| 2 | Is yaw rate linearly decodable from T4/T5 in the corridor? | ridge regression T4/T5 → yaw rate on held-out trajectories, R² > 0.5 | **PASS** (test R² 0.787, 60 held-out episodes) |
 | 3 | Does the trained core carry heading in EPG? | heading decode from EPG R² > 0.8 **and** the ring shows a single bump rotating with yaw | pending |
 
 ## Repo layout
@@ -170,8 +174,10 @@ flybywire/
   data/                     trajectory format, T4/T5 memmap cache
   train/                    bc.py (implemented), ppo.py (stub), sweep.py
   eval/                     heading metrics, EPG ring layouts + plot
-  envs/, dash/              corridor env, expert, vec env, dashboard (stubs)
-scripts/                    check_env, setup_env, gate1, calibrate, build_cache, count_params, smoke, stubs
+  envs/                     PyBullet corridor env, scripted expert, vec env (spawned workers)
+  dash/                     dashboard (stub)
+scripts/                    check_env, setup_env, gate1, calibrate, collect_expert, build_cache, gate2,
+                            count_params, smoke, stubs
 tests/                      invariants 1–10 and component tests
 docs/DECISIONS.md           dated decisions and every deviation from the spec
 ```

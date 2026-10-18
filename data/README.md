@@ -8,8 +8,9 @@ points here by default. On WSL, keep this on the Linux filesystem, never under `
 | `flyvis/` | `FLYVIS_ROOT_DIR`: flyvis pretrained models, `direction_map.json` | `flyvis download-pretrained --skip_large_files` (run by `make env`); `make calibrate` writes `direction_map.json` |
 | `flywire/raw/` | FlyWire Codex connections + cell-type annotation tables (snapshot 783) | **Manual download** from FlyWire Codex (sign-in / terms acceptance may be required); see the README "Data" section |
 | `flywire/processed/` | `cx_graph.npz`: mask `M` (bool, `M[i, j]` = pre i → post j), neuron ids, type labels, group index arrays, instance names | `python -m flybywire.connectome.flywire` |
-| `expert/` | `traj_XXXXX.npz`: `hexals (T, 721)` fp16 @ 100 Hz, `actions (T_dec, 4)` fp32 normalized, state arrays, `rel_yaw (T,)`, `yaw_rate (T,)`, `collided`, metadata | `scripts/collect_expert.py` (week 1) |
+| `expert/` | `traj_XXXXX.npz`: `hexals (T, 721)` fp16 @ 100 Hz, `actions (T_dec, 4)` fp32 normalized, state arrays, `rel_yaw (T,)`, `yaw_rate (T,)`, `collided`, metadata | `scripts/collect_expert.py` (`make collect`) |
 | `frames/` | raw frames for at most 20 episodes (debugging and video only) | `scripts/collect_expert.py --save-frames` |
-| `cache/` | `t4t5_fp16.npy` memmap `(total_T, 8, 721)`, `offsets.npy`, `manifest.json` | `scripts/build_cache.py` |
+| `cache/` | `t4t5_fp16.npy` memmap `(total_T, 8, 721)`, `offsets.npy`, `manifest.json` | `scripts/build_cache.py` (`make cache`) |
+| `textures/` | wall texture PNGs for `env.wall_texture` | written by the corridor env on first use |
 | `flywire/skeletons/` | `sk_lod1_783_healed_ds2.parquet`, skeletons of all release-783 neurons (Zenodo 10877326, CC BY 4.0; D28) | manual download |
 | `smoke/` | synthetic trajectories + cache for `make smoke` (plumbing only, not a result) | `scripts/smoke_end_to_end.py` |

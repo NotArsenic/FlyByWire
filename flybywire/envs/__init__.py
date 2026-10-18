@@ -1,1 +1,1 @@
-"""Corridor environment, scripted expert and vectorised envs (stubs until week 1)."""
+"""Corridor environment, scripted expert and vectorised envs."""

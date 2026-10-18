@@ -58,13 +58,14 @@ PPO uses gymnasium `AutoresetMode.SAME_STEP` (DECISIONS D20).
 - `data/flyvis/` — `FLYVIS_ROOT_DIR` (pretrained models, `direction_map.json`)
 - `data/flywire/raw/` (manual Codex download, snapshot 783), `data/flywire/processed/cx_graph.npz`
 - `data/expert/traj_XXXXX.npz` — hexals fp16 @ 100 Hz, actions @ 25 Hz, privileged state
+- `data/frames/` (raw frames of the first 20 episodes, `--save-frames`), `data/textures/` (wall textures)
 - `data/cache/` — `t4t5_fp16.npy` memmap `(total_T, 8, 721)`, `offsets.npy`, `manifest.json`
 - `runs/` — checkpoints, logs, reports. Never put data under `/mnt/c` on WSL.
 
 ## Commands
 
 `make env` (create env) · `make check` · `make test` · `make smoke` · `make gate1` ·
-`make calibrate` · `make params` · `make lint` · `make lock`
+`make calibrate` · `make collect` · `make cache` · `make gate2` · `make params` · `make lint` · `make lock`
 
 After modifying code, run `graphify update .` to refresh the knowledge graph (git-ignored).
 

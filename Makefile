@@ -5,7 +5,7 @@ else
 PY ?= conda run --no-capture-output -n flybywire python
 endif
 
-.PHONY: env check test smoke gate1 calibrate params lint lock
+.PHONY: env check test smoke gate1 calibrate collect cache gate2 params lint lock
 
 env:        ## create the conda env and install everything (scripts/setup_env.sh)
 	bash scripts/setup_env.sh
@@ -24,6 +24,15 @@ gate1:      ## flyvis state-carry equivalence + throughput gate
 
 calibrate:  ## measure T4/T5 preferred directions -> data/flyvis/direction_map.json
 	$(PY) scripts/calibrate_t4t5_directions.py
+
+collect:    ## scripted-expert trajectories -> data/expert (300 episodes, ~7 min)
+	$(PY) scripts/collect_expert.py
+
+cache:      ## T4/T5 cache from data/expert -> data/cache (~3.5 GB)
+	$(PY) scripts/build_cache.py
+
+gate2:      ## ridge T4/T5 -> yaw rate on held-out trajectories -> runs/gate2/report.json
+	$(PY) scripts/gate2_decode_yaw_rate.py
 
 params:     ## effective trainable parameter counts
 	$(PY) scripts/count_params.py
