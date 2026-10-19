@@ -62,7 +62,7 @@ def main(argv=None) -> int:
 
     stages = [s.split("=", 1) for s in args.stages]
     tmp = Path(tempfile.mkdtemp())
-    for i, (label, path) in enumerate(stages):
+    for i, (_, path) in enumerate(stages):
         if path == "untrained":
             like = next(p for _, p in stages[i + 1 :] if p != "untrained")
             stages[i][1] = untrained_checkpoint(like, tmp / "untrained.pt")
