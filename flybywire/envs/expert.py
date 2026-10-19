@@ -10,7 +10,7 @@ With `expert.maneuvers` set, it also turns on the spot now and then: slows down,
 large angle, holds, and comes back to the corridor heading, by a full rotation if that is the
 shorter way. With maneuvers.targets = uniform the far heading is drawn from the whole circle
 instead, reached and left the short way, so the held headings cover the circle evenly rather than
-a few multiples of 45 deg (D40). The yaw reference follows a trapezoidal rate profile and replaces the heading target
+a few multiples of 45 deg (D42). The yaw reference follows a trapezoidal rate profile and replaces the heading target
 (no max_heading clip) while the turn lasts. The potential field is in world coordinates, so
 avoidance keeps working at any heading, within the forward-only body speed limits. Without the
 key the expert is the plain one.
