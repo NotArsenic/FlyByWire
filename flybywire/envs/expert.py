@@ -8,7 +8,9 @@ heading PID turns toward it. Velocity is `speed` along that heading, altitude is
 
 With `expert.maneuvers` set, it also turns on the spot now and then: slows down, yaws through a
 large angle, holds, and comes back to the corridor heading, by a full rotation if that is the
-shorter way. The yaw reference follows a trapezoidal rate profile and replaces the heading target
+shorter way. With maneuvers.targets = uniform the far heading is drawn from the whole circle
+instead, reached and left the short way, so the held headings cover the circle evenly rather than
+a few multiples of 45 deg (D40). The yaw reference follows a trapezoidal rate profile and replaces the heading target
 (no max_heading clip) while the turn lasts. The potential field is in world coordinates, so
 avoidance keeps working at any heading, within the forward-only body speed limits. Without the
 key the expert is the plain one.
@@ -143,8 +145,12 @@ class ScriptedExpert:
 
     def start_turn(self) -> None:
         rng = self.turn_rng
-        far = float(rng.choice(np.asarray(self.turns.angles_deg))) * rng.choice([-1, 1])
-        home = 360.0 * np.round(far / 360.0)  # nearest multiple of 360, so the short way back to heading 0
+        if self.turns.get("targets", "angles") == "uniform":
+            home = 360.0 * np.round(np.degrees(self.yaw_u) / 360.0)
+            far = home + rng.uniform(-180.0, 180.0)
+        else:
+            far = float(rng.choice(np.asarray(self.turns.angles_deg))) * rng.choice([-1, 1])
+            home = 360.0 * np.round(far / 360.0)  # nearest multiple of 360, so the short way back to heading 0
         out = [(far, rng.uniform(*self.turns.hold_s))] if far != home else []
         self.legs = [(np.deg2rad(angle), hold) for angle, hold in (*out, (home, 0.0))]
         self.leg_from, self.leg_t = self.yaw_u, 0.0

@@ -9,7 +9,7 @@ from omegaconf import OmegaConf
 from flybywire.clocks import clocks_from_cfg
 from flybywire.config import data_dir, load_config
 from flybywire.data.trajectories import Trajectory, trajectory_path
-from flybywire.envs.corridor import CorridorEnv, body_to_world_velocity, denormalize_action, normalize_action
+from flybywire.envs.corridor import CorridorEnv, body_to_world_velocity, denormalize_action, normalize_action, wrap
 from flybywire.envs.expert import ExecNoise, ScriptedExpert, surface_distance, turn_profile
 from flybywire.envs.vec import make_vec_env
 
@@ -189,6 +189,21 @@ def test_maneuver_turns_and_returns_to_heading_zero(angle, span, seconds):
     assert np.abs(actions[:, 3]).max() < 1.0
     if span == 360:
         assert np.abs(rel_yaw).max() > 3.0  # went through +/-pi
+
+
+@pytest.mark.parametrize("seed", [0, 3])
+def test_uniform_maneuver_holds_the_drawn_heading(seed):
+    cfg = load_config(overrides=[
+        "env.n_obstacles=0", "env.episode_seconds=5", "expert.maneuvers.targets=uniform",
+        "expert.maneuvers.wait_s=[1.0,1.0]", "expert.maneuvers.hold_s=[2.0,2.0]",
+    ])
+    rng = np.random.default_rng([seed, 1])
+    rng.uniform(1.0, 1.0)
+    far = np.radians(rng.uniform(-180.0, 180.0))
+    _, rel_yaw, _, info = fly(cfg, seed=seed)
+    assert not info["collision"]
+    held = np.abs(wrap(rel_yaw - far)) < 0.1
+    assert held.sum() > 1.5 * cfg.clocks.sensory_hz
 
 
 def test_yaw_crossing_pi_has_no_kick(short_cfg):
