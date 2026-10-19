@@ -93,6 +93,20 @@ def hold_branch(model, v, r, s, n_steps: int, recurrent: bool = True) -> torch.T
     return torch.stack(rs, dim=1)
 
 
+@torch.no_grad()
+def pause_branch(model, v, r, s_seq, n_steps: int) -> torch.Tensor:
+    """Step the core n_steps from state v with one row of LPTC channels s_seq (B, L, 8) per step.
+
+    After L steps the last row is held. Returns (B, n_steps + 1, N) rates, index 0 = r.
+    """
+    u = model.inproj(s_seq)
+    rs = [r]
+    for t in range(n_steps):
+        v, r = model.core(v, u[:, min(t, u.shape[1] - 1)])
+        rs.append(r)
+    return torch.stack(rs, dim=1)
+
+
 def dark_branch(model, v, r, blank, n_steps: int, recurrent: bool = True) -> torch.Tensor:
     """hold_branch on the LPTC channels of the T4/T5 pattern ``blank`` (8, 721)."""
     with torch.no_grad():
