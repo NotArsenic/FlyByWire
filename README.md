@@ -3,12 +3,23 @@
 A simulated quadcopter that steers down an obstacle corridor using a frozen, connectome-constrained
 model of the fly optic lobe feeding a recurrent network wired like the FlyWire central complex.
 
-<!-- Demo: lesion video (scripts/render_lesion_video.py) goes here once available, e.g.
-<p align="center"><img src="docs/media/lesion_demo.gif" width="720"></p> -->
+<p align="center"><img src="docs/media/progress.gif" width="900"></p>
 
-> **Status:** env, DART expert data, BC + DAgger, real-vs-rewired sweeps and time-freeze pause
-> training are done. Gates 1 and 2 pass; Gate 3 fails (bump share at most 0.36 on the final data,
-> against 0.5). PPO fine-tuning is being implemented; dashboard and lesion video come after it.
+*One network per training stage, each flying the same held-out slalom corridor (1.6 m obstacle
+spacing). Labels give each stage's success over 200 held-out slalom corridors; this corridor was
+picked as the first where the last stage makes it and the one before does not.*
+
+<p align="center"><img src="docs/media/dashboard.gif" width="900"></p>
+
+*The final network flying a slalom corridor: chase camera, what its eye sees, the corridor from
+above and the EPG ring on the anatomical ellipsoid-body layout, with the true and decoded heading
+drawn in the ring's frame. EPG is silenced from 6 s: the bump is gone, steering stops responding
+and the drone turns into an obstacle.*
+
+> **Status:** done. Env, DART expert data, BC + DAgger, real-vs-rewired sweeps, time-freeze pause
+> training, closed-loop lesions, PPO and a final dense-corridor stage. Gates 1 and 2 pass; Gate 3
+> fails (bump share at most 0.36 on the final data, against 0.5). Across every pre-registered test
+> the FlyWire wiring did not beat a degree-preserving rewire. PPO did not improve on BC.
 
 ## What is reused vs. built
 
@@ -22,11 +33,14 @@ Physics and the quadcopter model come from gym-pybullet-drones (Panerati et al.,
   fixed ego-motion flow templates and calibrated preferred directions;
 - a **FlyWire-masked recurrent central complex** (ER, EPG, PEN, PEG, Δ7, PFL3): one rate population
   whose only neuron-to-neuron path is the connectome mask;
-- **BC training** (behavior cloning from a scripted expert with DART noise and DAgger; PPO
-  fine-tuning with a KL anchor to the BC policy is being implemented);
+- **staged training**: behavior cloning from a scripted expert (plain, then turning maneuvers,
+  then DART noise and DAgger), PPO fine-tuning with a KL anchor to the BC policy, and a last BC
+  stage on denser corridors;
 - **lesioning** of cell types at inference time;
 - a **null-model comparison**: real connectome vs. a directed degree-preserving rewire, with
-  protocols written before training (10 seeds per mask on the turning data, 6 on the DART data).
+  protocols written before training (10 seeds per mask on the turning data, 6 on the DART data,
+  6 on the uniform-hold data);
+- a **live training window** and a **dashboard** with lesion toggles.
 
 ## Architecture
 
@@ -158,7 +172,16 @@ make collect     # 300 scripted-expert episodes -> data/expert (hexals, actions,
 make cache       # frozen flyvis over the stored hexals -> data/cache T4/T5 memmap (3.5 GB, ~1 min)
 make gate2       # ridge T4/T5 -> yaw rate on held-out trajectories -> runs/gate2/report.json
 make params      # effective trainable parameters (W counted on-mask only)
+
+python -m flybywire.train.bc --cache data/cache_dart_agg2 --out runs/bc/demo heads.decoder=anatomical
+python -m flybywire.train.ppo --bc runs/bc/demo/model_best.pt --out runs/ppo/demo --watch --record-every 50
+python scripts/eval_curriculum.py --ckpts "demo=runs/bc/demo/model_best.pt"   # success per corridor level
+python scripts/eval_lesions.py --ckpt runs/bc/demo/model_best.pt              # EPG / PEN / D7 in closed loop
 ```
+
+`--watch` opens one window on a training env: a chase camera, the eye's view, the corridor from
+above, the EPG ring and the training curves. `--record-every N` saves that window as a video for one
+episode every N updates (`<out>/watch/`).
 
 ## Gates
 
@@ -179,19 +202,18 @@ flybywire/
   vision/                   BoxEye, frozen flyvis stepper, flow templates, LPTC, directions, Farneback
   core/                     CentralComplex population, heads, lesions, model wiring
   data/                     trajectory format, T4/T5 memmap cache
-  train/                    bc.py (implemented), ppo.py (stub), sweep.py
-  eval/                     heading metrics, EPG ring layouts + plot
+  train/                    bc.py, ppo.py, sweep.py, watch.py (live training window)
+  eval/                     closed loop, heading metrics, EPG ring, topography, darkness, live flight views
   envs/                     PyBullet corridor env, scripted expert, vec env (spawned workers)
-  dash/                     dashboard (stub)
-scripts/                    check_env, setup_env, gate1, calibrate, collect_expert, build_cache, gate2,
-                            count_params, smoke, stubs
+  dash/                     Streamlit dashboard with lesion toggles
+scripts/                    data and gates, evaluations, sweep statistics, lesion video, progress GIF
 tests/                      invariants 1–10 and component tests
 docs/DECISIONS.md           dated decisions and every deviation from the spec
 ```
 
 ## Results
 
-Latest: BC on 1000 turning-expert episodes with DART execution noise plus two DAgger rounds (1600
+**Real vs. rewired on the DART data (D38).** BC on 1000 turning-expert episodes with DART execution noise plus two DAgger rounds (1600
 episodes), scored on 100 held-out episodes; mean ± sd over seeds (D38). "learned" is the free
 2 × 51 heading readout, "anatomical" the fixed population vector over EPG EB angles. Bump share is
 on the anatomical ring (0.5 ≈ a 53° FWHM bump, 0.3 ≈ 30°). Closed loop: seeds 0-2 of each
@@ -215,12 +237,50 @@ chosen after seeing the data, so it is a lead to replicate, not a finding. Train
 with time-freeze pauses (D39) roughly halves heading drift through 1-2 s of no visual motion,
 with real and rewired again indistinguishable.
 
-Figures (placeholders): real vs. rewired adjacency; ring bump vs. heading; heading decode per
-condition; lesion effects; BC → PPO success rate.
+**Uniform holding headings (D42).** The expert's turns now end at headings drawn from the whole
+circle, to test whether the stable headings near 0 and ±85° came from where the old expert rested,
+and whether wiring matters once a heading must be held anywhere. Pre-registered in
+`docs/protocols/sweep_uniform_pauses.md`, 18 runs. The velocity field is a little flatter (p 0.074)
+but the stable points stay (±85° in 8 of 12 runs); real vs. rewired: drift p 0.55, field rms
+p 0.26, bump share p 0.996; rewired flies better again (82.9% vs 64.3%) but p 0.119. Over three
+datasets the FlyWire mask did not beat the rewire on any pre-registered measure.
+
+**PPO (D43).** Three setups (crash penalty, exploration noise, rollout length, checkpoint picked on
+separate validation corridors) all left the deterministic policy at or below BC: best 75.0% on the
+test corridors against BC's 79.5%. PPO improved the noisy training policy, not its mean.
+
+**Dense-corridor stage (D44).** A last BC stage on corridors with obstacles every 2.5, 2.0 and
+1.6 m, from the stage-3 network, with the original data replayed. Success on 200 held-out
+corridors per level [Wilson 95%]:
+
+| Network | default | spaced 2.5 m | dense 2.0 m | slalom 1.6 m |
+|---|---|---|---|---|
+| scripted expert | 100 | 96.5 | 99.0 | 98.0 |
+| untrained | 0 | | | 0 |
+| 1. BC, plain expert | 53.5 | | | 25.5 |
+| 2. BC, turning expert | 59.0 | | | 31.5 |
+| 3. BC, DART + DAgger | 79.5 [73.4, 84.5] | 65.5 | 58.0 | 54.5 [47.6, 61.3] |
+| 4. + dense corridors | 80.5 [74.5, 85.4] | 67.5 | 65.0 | 70.0 [63.3, 75.9] |
+
+**Lesions in closed loop (D41, D44).** Cell types silenced for the whole flight, 200 held-out
+default corridors; "gain" is how far the bump turns per degree the drone turns.
+
+| Lesion | stage 3: success | heading err | gain | stage 4: success | heading err | gain |
+|---|---|---|---|---|---|---|
+| none | 79.5% | 5.8° | 1.12 | 80.5% | 4.4° | 1.01 |
+| EPG | 0% | 59.7° | 0 | 0% | 70.0° | 0 |
+| PEN | 82.5% | 11.0° | 1.23 | 65.0% | 21.9° | 0.71 |
+| Δ7 | 5.0% | 6.7° | 0.81 | 3.5% | 7.7° | 0.71 |
+
+Silencing EPG removes the bump and the drone's steering with it: the actor reads only PFL3, and
+PFL3 is driven through EPG, so flight depends on the compass. Silencing PEN does not freeze the
+compass in either network (self-motion reaches EPG through ER all the time), but after the dense
+stage the bump follows turns less well and success falls. Δ7 matters for the motor side, not the
+ring: the compass holds and the drone flies too fast and crashes.
 
 ## Lesion demo
 
-Programmatic API (works now):
+Programmatic API:
 
 ```python
 from flybywire.config import load_config
@@ -234,11 +294,18 @@ with lesioned(model, ["PEN"]):        # scoped lesion
     ...
 ```
 
-Demo video (once the env and a trained policy exist):
+Videos and the dashboard:
 
 ```bash
-python scripts/render_lesion_video.py --checkpoint runs/<run>/model.pt --out demo.mp4
-streamlit run flybywire/dash/app.py   # live dashboard (stub)
+# the dashboard GIF above: lesions on a schedule, any corridor level
+python scripts/render_lesion_video.py --ckpt runs/curriculum/dense_s5/model.pt --out docs/media/dashboard.mp4 \
+    --gif docs/media/dashboard.gif --seed 10001 --seconds 12 env.obstacle_spacing_m=1.6 env.n_obstacles=14 \
+    --schedule EPG:6-12
+# the progress GIF: one tile per training stage on the same corridor
+python scripts/render_progress.py --out docs/media/progress.gif --seed 10001 --seconds 12 \
+    env.obstacle_spacing_m=1.6 env.n_obstacles=14 --stages "stage 3=runs/sweep_dart/real_anatomical_s5/model_best.pt" ...
+# fly a policy live and toggle lesions while it flies
+streamlit run flybywire/dash/app.py -- --ckpt runs/curriculum/dense_s5/model.pt
 ```
 
 ## Acknowledgements and citations

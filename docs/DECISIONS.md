@@ -713,3 +713,39 @@ Side issues: a training env opened in a pybullet GUI died when its window was cl
 run with it, so the live view's chase camera is now a copy of env 0 in the viewer's own process.
 PPO with its validation envs, three BC trainings and closed-loop scoring together ran the 31 GB
 machine out of memory; they now run one after another. runs/ppo.
+
+## 2026-10-20 — D44. Dense-corridor stage
+
+A last training stage on harder corridors. The default layout spreads 8 obstacles over 26 m with
++-0.5 m jitter; packed tighter that way, neighbours nearly touch and the expert, which plans around
+one obstacle at a time, crashes (12 obstacles 5/40, 16: 17/40). env.obstacle_spacing_m places
+obstacles at a fixed spacing from x = 4 m with +-15% jitter (key absent or null = old layout, same
+random draws). Levels in configs/default.yaml curriculum: spaced 2.5 m, dense 2.0 m, slalom 1.6 m;
+the last two with a slower, steeper expert (speed 1.0, max heading 65 deg, influence 0.5 m), which
+flies all three at 96.5-99% on held-out seeds. Gap height (a Flappy Bird stage) was not tried: the
+8 LPTC channels have no up/down looming, so the network couldn't see where a gap is.
+
+400 DART expert episodes per level (seeds 3000-3399) plus the 1000 data/expert_dart episodes as
+replay, data/cache_curriculum (2200 episodes, 25 GB). BC fine-tuned from real_anatomical_s5 (bc
+--init), lr 3e-4, 20 epochs; model.pt (last epoch) was fixed as the stage's output before any flight.
+Closed loop, test seeds 10000-10199, success [Wilson 95]:
+
+| | default | spaced | dense | slalom |
+|---|---|---|---|---|
+| expert | 100 | 96.5 | 99.0 | 98.0 |
+| real_anatomical_s5 (BC, stage 3) | 79.5 [73.4, 84.5] | 65.5 [58.7, 71.7] | 58.0 [51.1, 64.6] | 54.5 [47.6, 61.3] |
+| dense stage (stage 4) | 80.5 [74.5, 85.4] | 67.5 [60.7, 73.6] | 65.0 [58.2, 71.3] | 70.0 [63.3, 75.9] |
+
+Slalom gains 15.5 points with no loss on the default corridor; spaced and dense move within their
+intervals. One network, one seed. Earlier stages on the same seeds (separate networks, not one
+lineage except stage 4 from 3): untrained 0 / 0, BC on the plain expert 53.5 / 25.5, BC on turns
+59.0 / 31.5 (default / slalom). docs/media/progress.gif shows each flying held-out slalom seed
+10001, the first seed where stage 4 makes it and stage 3 does not (so picked to show a difference;
+the rates in the labels are the measured ones). runs/curriculum.
+
+Lesions on the stage-4 network (scripts/eval_lesions.py, default corridor, 200 test seeds): none
+80.5%, EPG 0%, PEN 65.0% (heading error 21.9 deg against 4.4, gain 0.71 against 1.01), D7 3.5%.
+Unlike stage 3 (D41), PEN now matters: the bump follows turns less well without it and success
+drops 15.5 points. The compass still isn't frozen. docs/media/dashboard.gif shows the stage-4
+network on slalom seed 10001 with EPG silenced from 6 s; a run with PEN silenced at 4-7 s ended on
+an obstacle at 7.7 s, before its planned EPG window, and was not used. runs/lesions/dense_s5.
