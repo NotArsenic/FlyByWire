@@ -108,18 +108,20 @@ class Flight:
         return self.frames[-1]
 
     def chase_image(self, width: int = 400, height: int = 300) -> np.ndarray:
-        """Third-person view from behind and above the drone (TinyRenderer, RGB)."""
         pos, _ = p.getBasePositionAndOrientation(self.env._drone, physicsClientId=self.env._cid)
-        view = p.computeViewMatrixFromYawPitchRoll(pos, 0.8, np.degrees(self.yaw) - 90, -20, 0, 2,
-                                                   physicsClientId=self.env._cid)
-        proj = p.computeProjectionMatrixFOV(60, width / height, 0.05, 40, physicsClientId=self.env._cid)
-        img = p.getCameraImage(width, height, view, proj, renderer=p.ER_TINY_RENDERER, shadow=0,
-                               physicsClientId=self.env._cid)[2]
-        return np.reshape(img, (height, width, 4))[..., :3]
+        return chase_image(self.env._cid, pos, self.yaw, width, height)
 
     def close(self) -> None:
         self.model.restore()
         self.env.close()
+
+
+def chase_image(cid: int, pos, yaw: float, width: int = 400, height: int = 300) -> np.ndarray:
+    """Third-person view from behind and above a drone at pos facing yaw (TinyRenderer, RGB)."""
+    view = p.computeViewMatrixFromYawPitchRoll(pos, 0.8, np.degrees(yaw) - 90, -20, 0, 2, physicsClientId=cid)
+    proj = p.computeProjectionMatrixFOV(60, width / height, 0.05, 40, physicsClientId=cid)
+    img = p.getCameraImage(width, height, view, proj, renderer=p.ER_TINY_RENDERER, shadow=0, physicsClientId=cid)[2]
+    return np.ascontiguousarray(np.reshape(img, (height, width, 4))[..., :3], dtype=np.uint8)
 
 
 def draw(fig, flight: Flight, title: str = "") -> None:

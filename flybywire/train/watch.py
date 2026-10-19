@@ -1,11 +1,13 @@
-"""Live view of PPO training: env 0's eye, the corridor from above, the EPG ring, the curves,
-and optionally a 3D pybullet window that mirrors env 0's drone.
+"""Live view of PPO training in one window: a chase camera on env 0's drone, what its eye sees,
+the corridor from above, the EPG ring and the training curves.
 
-Each view runs in its own process and gets small messages through a queue. Training never waits
-for them: when a queue is full the message is dropped, so a slow or closed window costs nothing.
-The 3D view is a copy, not the training env itself: it rebuilds env 0's corridor and puts the
-drone where env 0 reports it, without physics. (Opening a training env in a GUI tied the env to
-the window: closing the window killed the env and the run, D43.)
+The window runs in its own process and gets small messages through a queue. Training never waits
+for it: when the queue is full a message is dropped, so a slow or closed window costs nothing.
+The chase camera is a copy of env 0, not env 0 itself: the window's process rebuilds env 0's
+corridor in its own pybullet client and puts the drone where env 0 reports it. (Opening the
+training env in a pybullet GUI tied it to that window: closing the window killed the run, D43.)
+
+``record(path)`` saves the window as a video for env 0's next full episode.
 """
 
 from __future__ import annotations
@@ -20,39 +22,29 @@ from flybywire.eval.ring import ring_activity
 
 
 class Watcher:
-    def __init__(self, layout, epg_index, cfg, panel: bool = True, mirror: bool = False):
+    def __init__(self, layout, epg_index, cfg, chase: bool = True):
         from omegaconf import OmegaConf
 
         ctx = mp.get_context("spawn")
+        self.q = ctx.Queue(maxsize=64)
         self.layout = layout
         self.epg = np.asarray(epg_index)
-        c = cfg.env.corridor
-        self.views, self.procs = [], []
-        if panel:
-            self.views.append(("panel", ctx.Queue(maxsize=32)))
-            target, args = run_panel, (layout.n_wedges, layout.label, float(c.length_m), float(c.width_m))
-            self._start(ctx, target, self.views[-1][1], args)
-        if mirror:
-            self.views.append(("mirror", ctx.Queue(maxsize=32)))
-            self._start(ctx, run_mirror, self.views[-1][1], (OmegaConf.to_container(cfg, resolve=True),))
+        cfg_dict = OmegaConf.to_container(cfg, resolve=True) if chase else None
+        self.proc = ctx.Process(target=run_window, args=(self.q, layout.n_wedges, layout.label, cfg_dict,
+                                                         float(cfg.env.corridor.length_m),
+                                                         float(cfg.env.corridor.width_m)), daemon=True)
+        self.proc.start()
 
-    def _start(self, ctx, target, q, args) -> None:
-        proc = ctx.Process(target=target, args=(q, *args), daemon=True)
-        proc.start()
-        self.procs.append(proc)
-
-    def _put(self, msg, to=("panel", "mirror")) -> None:
-        for name, q in self.views:
-            if name in to:
-                try:
-                    q.put_nowait(msg)
-                except queue.Full:
-                    pass
+    def _put(self, msg) -> None:
+        try:
+            self.q.put_nowait(msg)
+        except queue.Full:
+            pass
 
     def step(self, frame, r, heading, rel_yaw) -> None:
         ring = ring_activity(r.detach().cpu().numpy()[self.epg], self.layout)
         h = heading.detach().cpu().numpy()
-        self._put(("step", np.asarray(frame), ring, float(np.arctan2(h[0], h[1])), float(rel_yaw)), to=("panel",))
+        self._put(("step", np.asarray(frame), ring, float(np.arctan2(h[0], h[1])), float(rel_yaw)))
 
     def position(self, pos, quat) -> None:
         self._put(("pos", np.asarray(pos, dtype=float), np.asarray(quat, dtype=float)))
@@ -62,55 +54,73 @@ class Watcher:
 
     def update(self, stats: dict) -> None:
         keys = ("update", "success_100", "return_100", "kl_bc", "aux_heading", "value_loss", "warmup")
-        self._put(("update", {k: stats.get(k) for k in keys}), to=("panel",))
+        self._put(("update", {k: stats.get(k) for k in keys}))
+
+    def record(self, path, title: str) -> None:
+        # blocking put: a dropped request would silently lose the recording
+        self.q.put(("record", str(path), title))
 
     def close(self) -> None:
-        self._put(None)
-        for proc in self.procs:
-            proc.join(timeout=5)
-            if proc.is_alive():
-                proc.terminate()
+        try:
+            self.q.put(None, timeout=5)
+        except queue.Full:
+            pass
+        self.proc.join(timeout=30)
+        if self.proc.is_alive():
+            self.proc.terminate()
 
 
-def run_mirror(q, cfg_dict: dict) -> None:
-    import pybullet as p
-    from omegaconf import OmegaConf
+class Mirror:
+    """env 0's corridor in a headless pybullet client, for the chase camera."""
 
-    from flybywire.envs.corridor import CorridorEnv
+    def __init__(self, cfg_dict: dict):
+        from omegaconf import OmegaConf
 
-    env = CorridorEnv(OmegaConf.create(cfg_dict), gui=True)
-    cid = env._cid
-    p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0, physicsClientId=cid)
-    while p.isConnected(cid):
-        msg = q.get()
-        if msg is None:
-            break
-        if msg[0] == "episode":
-            env.obstacles = msg[1]
-            env._aviary.reset()
-            env._drone = int(env._aviary.DRONE_IDS[0])
-        elif msg[0] == "pos":
-            pos, quat = msg[1], msg[2]
-            p.resetBasePositionAndOrientation(env._drone, pos, quat, physicsClientId=cid)
-            yaw = np.degrees(p.getEulerFromQuaternion(quat)[2])
-            p.resetDebugVisualizerCamera(1.6, yaw - 90, -25, pos, physicsClientId=cid)
+        from flybywire.envs.corridor import CorridorEnv
+
+        self.env = CorridorEnv(OmegaConf.create(cfg_dict))
+        self.pos, self.yaw = np.array([1.0, 0.0, 1.2]), 0.0
+
+    def episode(self, obstacles) -> None:
+        self.env.obstacles = obstacles
+        self.env._aviary.reset()
+        self.env._drone = int(self.env._aviary.DRONE_IDS[0])
+
+    def pose(self, pos, quat) -> None:
+        import pybullet as p
+
+        self.pos = pos
+        self.yaw = p.getEulerFromQuaternion(quat)[2]
+        p.resetBasePositionAndOrientation(self.env._drone, pos, quat, physicsClientId=self.env._cid)
+
+    def image(self) -> np.ndarray:
+        from flybywire.eval.live import chase_image
+
+        return chase_image(self.env._cid, self.pos, self.yaw, 480, 300)
 
 
-def run_panel(q, n_wedges: int, layout_label: str, length: float, width: float) -> None:
+def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, length: float, width: float) -> None:
     import matplotlib.pyplot as plt
     from matplotlib.patches import Circle, Rectangle
 
+    mirror = Mirror(cfg_dict) if cfg_dict is not None else None
     plt.ion()
-    fig = plt.figure("Fly-By-Wire PPO", figsize=(13, 7))
-    grid = fig.add_gridspec(2, 3)
-    ax_eye = fig.add_subplot(grid[0, 0])
-    ax_map = fig.add_subplot(grid[0, 1:])
-    ax_ring = fig.add_subplot(grid[1, 0], projection="polar")
-    ax_succ = fig.add_subplot(grid[1, 1])
-    ax_loss = fig.add_subplot(grid[1, 2])
+    fig = plt.figure("Fly-By-Wire PPO", figsize=(16, 8.4))
+    grid = fig.add_gridspec(2, 4, height_ratios=[1.25, 1], left=0.02, right=0.98, top=0.93, bottom=0.06,
+                            wspace=0.15, hspace=0.25)
+    ax_chase = fig.add_subplot(grid[0, :2])
+    ax_eye = fig.add_subplot(grid[0, 2])
+    ax_ring = fig.add_subplot(grid[0, 3], projection="polar")
+    ax_map = fig.add_subplot(grid[1, :2])
+    ax_succ = fig.add_subplot(grid[1, 2])
+    ax_loss = fig.add_subplot(grid[1, 3])
+    title = fig.suptitle("", fontsize=13)
 
+    chase = ax_chase.imshow(np.zeros((300, 480, 3), np.uint8))
+    ax_chase.set_title("env 0, chase camera", fontsize=9)
+    ax_chase.axis("off")
     eye = ax_eye.imshow(np.zeros((160, 160)), cmap="gray", vmin=0, vmax=255)
-    ax_eye.set_title("env 0: what the eye sees")
+    ax_eye.set_title("what the eye sees", fontsize=9)
     ax_eye.axis("off")
 
     theta = (np.arange(n_wedges) + 0.5) * 2 * np.pi / n_wedges
@@ -118,11 +128,11 @@ def run_panel(q, n_wedges: int, layout_label: str, length: float, width: float) 
     true_line, = ax_ring.plot([0, 0], [0, 1.2], "r-", lw=2, label="true heading")
     dec_line, = ax_ring.plot([0, 0], [0, 1.2], "c--", lw=2, label="decoded")
     ax_ring.set_yticks([])
+    ax_ring.set_xticks([])
     ax_ring.set_title(f"EPG ring ({layout_label})", fontsize=8)
-    ax_ring.legend(loc="lower right", fontsize=7, bbox_to_anchor=(1.3, -0.1))
+    ax_ring.legend(loc="lower center", fontsize=7, bbox_to_anchor=(0.5, -0.25), ncol=2)
 
-    trail_x, trail_y = [], []
-    obstacle_patches = []
+    trail_x, trail_y, obstacle_patches = [], [], []
     trail, = ax_map.plot([], [], "b-", lw=1)
     drone, = ax_map.plot([], [], "bo", ms=5)
     ax_map.set_xlim(0, length)
@@ -130,15 +140,27 @@ def run_panel(q, n_wedges: int, layout_label: str, length: float, width: float) 
     ax_map.set_aspect("equal")
     ax_map.axhline(width / 2, color="k")
     ax_map.axhline(-width / 2, color="k")
-    ax_map.set_title("corridor from above (env 0)")
+    ax_map.set_yticks([])
+    ax_map.set_title("corridor from above", fontsize=9)
 
-    stats = []
-    last_draw = 0.0
-    while plt.fignum_exists(fig.number):
+    stats, last_draw, closed = [], 0.0, False
+    armed, recording, frames = None, None, []
+
+    def finish_recording():
+        import imageio.v2 as imageio
+
+        if frames:
+            imageio.mimwrite(recording[0], frames, fps=25, codec="libx264", quality=7, macro_block_size=8)
+        frames.clear()
+
+    while True:
+        new_step = False
         try:
             while True:
                 msg = q.get_nowait()
                 if msg is None:
+                    if recording is not None and frames:
+                        finish_recording()
                     plt.close(fig)
                     return
                 kind = msg[0]
@@ -152,10 +174,20 @@ def run_panel(q, n_wedges: int, layout_label: str, length: float, width: float) 
                         b.set_color(plt.cm.viridis(h))
                     true_line.set_xdata([true, true])
                     dec_line.set_xdata([decoded, decoded])
+                    new_step = True
+                    if recording is not None:
+                        break  # one video frame per decision
                 elif kind == "pos":
                     trail_x.append(msg[1][0])
                     trail_y.append(msg[1][1])
+                    if mirror is not None:
+                        mirror.pose(msg[1], msg[2])
                 elif kind == "episode":
+                    if recording is not None:
+                        finish_recording()
+                        recording = None
+                    if armed is not None:
+                        recording, armed = armed, None
                     trail_x.clear()
                     trail_y.clear()
                     for patch in obstacle_patches:
@@ -165,12 +197,19 @@ def run_panel(q, n_wedges: int, layout_label: str, length: float, width: float) 
                         patch = Circle((x, y), hx) if k == 0 else Rectangle((x - hx, y - hy), 2 * hx, 2 * hy)
                         patch.set_color("0.4")
                         obstacle_patches.append(ax_map.add_patch(patch))
+                    if mirror is not None:
+                        mirror.episode(msg[1])
                 elif kind == "update":
                     stats.append(msg[1])
+                elif kind == "record":
+                    armed = (msg[1], msg[2])
         except queue.Empty:
             pass
+
         now = time.time()
-        if now - last_draw > 0.1:
+        if now - last_draw > 0.1 or (recording is not None and new_step):
+            if mirror is not None:
+                chase.set_data(mirror.image())
             trail.set_data(trail_x, trail_y)
             if trail_x:
                 drone.set_data([trail_x[-1]], [trail_y[-1]])
@@ -179,7 +218,7 @@ def run_panel(q, n_wedges: int, layout_label: str, length: float, width: float) 
                 ax_succ.clear()
                 ax_succ.plot(u, [s["success_100"] for s in stats], "g-")
                 ax_succ.set_ylim(0, 1)
-                ax_succ.set_title("success, last 100 episodes")
+                ax_succ.set_title("success, last 100 training episodes", fontsize=9)
                 warm = [s["update"] for s in stats if s["warmup"]]
                 if warm:
                     ax_succ.axvspan(min(warm), max(warm), color="0.9")
@@ -188,6 +227,19 @@ def run_panel(q, n_wedges: int, layout_label: str, length: float, width: float) 
                 ax_loss.plot(u, [s["aux_heading"] or 0 for s in stats], label="heading loss")
                 ax_loss.legend(fontsize=7)
                 ax_loss.set_xlabel("update")
-            fig.canvas.draw_idle()
+                title.set_text(f"PPO update {u[-1]}" + (f"   (recording: {recording[1]})" if recording else ""))
+            if recording is not None:
+                fig.canvas.draw()
+                frames.append(np.asarray(fig.canvas.buffer_rgba())[..., :3].copy())
+            elif not closed:
+                fig.canvas.draw_idle()
             last_draw = now
-        plt.pause(0.03)
+        if closed:
+            time.sleep(0.02)
+        elif plt.fignum_exists(fig.number):
+            plt.pause(0.02)
+        else:
+            from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+            FigureCanvasAgg(fig)  # the window was closed: keep drawing off-screen for recordings
+            closed = True

@@ -33,13 +33,15 @@ Checkpoints
     10000.. seeds of the closed-loop tests are not used for picking.
 
 Watching
-    ``--watch`` opens a live panel (flybywire/train/watch.py) on env 0: what the eye sees, the
-    corridor from above, the EPG ring and the training curves. ``--gui`` adds a pybullet window
-    with a chase camera that mirrors env 0's drone (a copy; closing it doesn't touch training).
+    ``--watch`` opens one live window (flybywire/train/watch.py) on env 0: a chase camera, what the
+    eye sees, the corridor from above, the EPG ring and the training curves. Closing it doesn't
+    touch training. ``--record-every N`` saves that window as <out>/watch/update_XXXX.mp4 for one
+    episode every N updates, so the runs can be compared over training.
 
 Usage:
   python -m flybywire.train.ppo --bc runs/sweep_dart/real_anatomical_s5/model_best.pt --out runs/ppo/demo
-                                [--updates N] [--hours H] [--watch] [--gui] [--resume] [key=value ...]
+                                [--updates N] [--hours H] [--watch] [--record-every N] [--resume]
+                                [key=value ...]
 """
 
 from __future__ import annotations
@@ -351,7 +353,8 @@ def load_bc(path, device, overrides=()):
 
 
 def train_ppo(cfg, model, out_dir, n_updates: int, hours: float | None = None, device: str = "cuda",
-              watch: bool = False, gui: bool = False, resume: bool = False, bc_path: str | None = None) -> dict:
+              watch: bool = False, record_every: int | None = None, resume: bool = False,
+              bc_path: str | None = None) -> dict:
     from flybywire.envs.vec import make_vec_env
 
     out = Path(out_dir)
@@ -389,12 +392,12 @@ def train_ppo(cfg, model, out_dir, n_updates: int, hours: float | None = None, d
         torch.save(state, out / name)
 
     watcher = None
-    if watch or gui:
+    if watch or record_every:
         from flybywire.eval.ring import model_layout
         from flybywire.train.watch import Watcher
 
-        watcher = Watcher(model_layout(cfg, model, "anatomical"), model.groups[model.group_roles["heading"]], cfg,
-                          panel=watch, mirror=gui)
+        watcher = Watcher(model_layout(cfg, model, "anatomical"), model.groups[model.group_roles["heading"]], cfg)
+        (out / "watch").mkdir(exist_ok=True)
     vec = make_vec_env(cfg, int(p.n_envs), seed=int(cfg.seed) * 1000 + first)
     OmegaConf.save(cfg, out / "config.yaml")
     best, t_start = -1.0, time.time()
@@ -431,6 +434,8 @@ def train_ppo(cfg, model, out_dir, n_updates: int, hours: float | None = None, d
                   f"ev {stats['explained_var']:.2f} ({stats['rollout_s']}+{stats['update_s']} s)", flush=True)
             if watcher is not None:
                 watcher.update(stats)
+                if record_every and update % record_every == 0:
+                    watcher.record(out / "watch" / f"update_{update:04d}.mp4", f"update {update}")
             if (update + 1) % int(p.save_every) == 0:
                 save("last.pt", update, extra=True)
                 save(f"model_u{update + 1:04d}.pt", update)
@@ -460,8 +465,8 @@ def main(argv=None) -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--updates", type=int, default=None, help="default ppo.updates")
     ap.add_argument("--hours", type=float, default=None, help="stop after this much wall time")
-    ap.add_argument("--watch", action="store_true", help="live panel of env 0")
-    ap.add_argument("--gui", action="store_true", help="3D pybullet view mirroring env 0")
+    ap.add_argument("--watch", action="store_true", help="live window on env 0")
+    ap.add_argument("--record-every", type=int, default=None, help="record the window every N updates")
     ap.add_argument("--resume", action="store_true", help="continue from <out>/last.pt")
     ap.add_argument("--device", default=None)
     ap.add_argument("overrides", nargs="*")
@@ -469,7 +474,8 @@ def main(argv=None) -> int:
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     model, cfg = load_bc(args.bc, device, args.overrides)
     n_updates = int(args.updates or cfg.ppo.updates)
-    res = train_ppo(cfg, model, args.out, n_updates, args.hours, device, args.watch, args.gui, args.resume, args.bc)
+    res = train_ppo(cfg, model, args.out, n_updates, args.hours, device, args.watch, args.record_every,
+                    args.resume, args.bc)
     print(f"[ppo] done, best validation success {res['best_validation']:.3f}")
     return 0
 
