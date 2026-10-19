@@ -104,6 +104,7 @@ bc:
   grad_clip: 1.0
   aux_weight: 0.5
   epochs: 50
+  pauses: null             # time-freeze pauses in training episodes (D39): {bank: dir, per_episode: n, p: prob}
 ppo:
   n_envs: 12
   rollout_decisions: 128

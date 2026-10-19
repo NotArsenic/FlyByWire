@@ -12,6 +12,7 @@ from flybywire.eval.darkness import (
     dark_stats,
     grey_t4t5,
     hold_branch,
+    pause_branch,
     recurrence_scaled,
     signed_stats,
     snapshots,
@@ -69,6 +70,19 @@ def test_hold_branch_takes_one_channel_vector_per_sample(model):
     for i in range(2):
         alone = hold_branch(model, v[i : i + 1], r[i : i + 1], s[i], 4)
         assert torch.allclose(both[i : i + 1], alone, atol=1e-6)
+
+
+def test_pause_branch_follows_the_rows_then_holds_the_last(model):
+    v0, r0 = snapshots(model, _x(), [8])[8]
+    seq = torch.randn(2, 3, 8, generator=torch.Generator().manual_seed(2))
+    got = pause_branch(model, v0, r0, seq, 6)
+    assert got.shape == (2, 7, model.n) and torch.equal(got[:, 0], r0)
+    v = v0
+    for t in range(6):
+        v, r = model.core(v, model.inproj(seq[:, min(t, 2)]))
+        assert torch.allclose(got[:, t + 1], r, atol=1e-6)
+    const = pause_branch(model, v0, r0, seq[:, :1], 4)
+    assert torch.allclose(const, hold_branch(model, v0, r0, seq[:, 0], 4), atol=1e-6)
 
 
 def test_recurrence_scaled_restores_the_weights_and_zero_is_off(model):

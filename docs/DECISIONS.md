@@ -591,3 +591,31 @@ readout now flies like the learned one (74.5% vs 76.4%) and its wall failure is 
 mask flies better than the real one (83.6% vs 67.3%, post hoc p 0.015). Demo candidate
 real_anatomical_s5: share 0.363, R^2 0.932, 79.5% closed loop (picked from six, so optimistic).
 runs/sweep_dart, runs/gate3_dart, runs/dagger_dart, runs/failure_breakdown.
+
+## 2026-10-19 — D39. Time-freeze pauses in BC
+
+D37 showed multi-stable heading under a held frame. Blanking input inside recorded windows while
+keeping the heading targets would teach hallucinated turns (there is no efference copy), so the
+pauses are synthetic and time stands still. bc.pauses {bank, per_episode, p} splices them into
+training episodes only (key absent = old behaviour; 24 updates on cache_turns give identical
+losses and grad norms). A pause starts after core step 4k+3 (k uniform, so mid-maneuver too),
+lasts M = 48..100 steps (multiple of 4) and shifts every later decision by M/4. Heading target
+held at theta(t0), action loss off on the M/4 inserted decisions, aux heading loss on, state
+carried through TBPTT windows. Recovery decisions keep their targets.
+
+Input is real flyvis, precomputed (scripts/build_pause_bank.py, flybywire/data/pause_bank.py):
+rerun the stored hexals, branch the state at t0, hold the frame M steps, then continue on the
+real frames t0+1.. for R = 60 steps before the cache takes over. R = 60, not 30: mean |bank -
+cache| / cache sd is 2.1% after 30 steps and 0.24% after 60. 4 entries per episode, >= 2R apart.
+data/pause_bank_turns: 4000 entries, 6.0 GB, 294 s.
+
+Pilot on cache_turns (anatomical readout, seed 0, 2 pauses per episode, n = 1 per cell): test R^2
+and error unchanged (0.975 -> 0.976 real, 0.971 -> 0.978 rewired). Drift through a held frame with
+its real transient, mean |.|: 1 s 8.9 -> 5.9 real, 9.5 -> 5.9 rewired; 2 s 11.6 -> 8.8, 13.2 ->
+8.9; 10 s 13.6 -> 14.2, 25.2 -> 12.9. Persistence improves inside the trained length, not beyond
+it for the real mask. The velocity field is ~2x flatter by rms but keeps its stable points near
+-79, +5, +87 deg: attenuated, not a continuous attractor. Grey drift gets worse (2 s 22.8 -> 37.2
+real, 18.2 -> 51.1 rewired), unexplained. Real and rewired don't separate (drift, field rms; bump
+share 0.37 vs 0.30, within seed spread; Gate 3 still fails). Persistence is now trained, so only
+real vs rewired under the same training is a comparison. The pilot ran on the pre-DART turning
+data; the next run should use data/cache_dart_agg2 with longer holds. runs/step4_pilot.
