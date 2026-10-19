@@ -10,6 +10,8 @@
 * The validation episodes are scored after every epoch; the epoch with the best validation heading
   R^2 is also saved as ``model_best.pt``.
 * fp32 compute: the fp16 cache is upcast per window.
+* ``bc.pauses`` (off when absent) splices synthetic pauses into the training episodes
+  (``flybywire/data/pause_bank.py``, D38); validation and test episodes are never spliced.
 
 CLI::
 
@@ -31,6 +33,7 @@ from omegaconf import OmegaConf
 
 from flybywire.clocks import Clocks, clocks_from_cfg
 from flybywire.data.cache import T4T5Cache
+from flybywire.data.pause_bank import PauseBank, PauseSampler, splice
 from flybywire.data.trajectories import Trajectory, heading_target
 from flybywire.eval.metrics import angular_error_deg, heading_r2
 
@@ -44,9 +47,12 @@ class EpisodeTargets:
 class BCData:
     """Cache-backed episodes plus their BC targets."""
 
-    def __init__(self, cache: T4T5Cache, clocks: Clocks):
+    def __init__(self, cache: T4T5Cache, clocks: Clocks, pauses: PauseSampler | None = None):
         self.cache = cache
         self.clocks = clocks
+        self.pauses = pauses
+        if pauses is not None:
+            pauses.bank.check_cache(cache)
         self.targets: list[EpisodeTargets] = []
         for i, p in enumerate(cache.trajectories):
             tr = Trajectory.load(p, load_hexals=False)
@@ -61,9 +67,18 @@ class BCData:
     def __len__(self) -> int:
         return len(self.targets)
 
-    def batch(self, idx, device) -> dict[str, torch.Tensor]:
+    def episode(self, i, rng=None):
+        """Frames, heading targets, actions and action mask of episode i, with pauses if ``rng`` is given."""
+        frames, heading, actions = self.cache.episode(i), self.targets[i].heading, self.targets[i].actions
+        entries = self.pauses.draw(i, rng) if self.pauses is not None and rng is not None else []
+        if len(entries) == 0:
+            return frames, heading, actions, np.ones(len(actions), dtype=bool)
+        return splice(frames, heading, actions, self.pauses.bank, entries, self.clocks)
+
+    def batch(self, idx, device, rng=None) -> dict[str, torch.Tensor]:
         spd = self.clocks.sensory_per_decision
-        lengths = [self.cache.length(i) for i in idx]
+        eps = [self.episode(i, rng) for i in idx]
+        lengths = [len(e[0]) for e in eps]
         tmax = int(math.ceil(max(lengths) / spd) * spd)
         kmax = tmax // spd
         b = len(idx)
@@ -72,14 +87,13 @@ class BCData:
         mask = np.zeros((b, tmax), dtype=bool)
         act = np.zeros((b, kmax, 4), dtype=np.float32)
         amask = np.zeros((b, kmax), dtype=bool)
-        for j, i in enumerate(idx):
-            t = lengths[j]
-            x[j, :t] = self.cache.episode(i)
-            head[j, :t] = self.targets[i].heading
+        for j, (frames, heading, actions, action_mask) in enumerate(eps):
+            t, k = lengths[j], len(actions)
+            x[j, :t] = frames
+            head[j, :t] = heading
             mask[j, :t] = True
-            k = self.targets[i].actions.shape[0]
-            act[j, :k] = self.targets[i].actions
-            amask[j, :k] = True
+            act[j, :k] = actions
+            amask[j, :k] = action_mask
         to = lambda a: torch.from_numpy(a).to(device)  # noqa: E731
         return {"x16": to(x), "heading": to(head), "mask": to(mask), "actions": to(act), "amask": to(amask)}
 
@@ -150,8 +164,11 @@ def train_bc(
 
     cache = T4T5Cache(cache_dir)
     cache.check_compatible(cfg.vision.flyvis_model, clocks.dt_sensory)
-    data = BCData(cache, clocks)
+    pcfg = OmegaConf.select(cfg, "bc.pauses", default=None)
+    sampler = PauseSampler(PauseBank(pcfg.bank), int(pcfg.per_episode), float(pcfg.p)) if pcfg else None
+    data = BCData(cache, clocks, sampler)
     rng = np.random.default_rng(int(cfg.seed))
+    pause_rng = np.random.default_rng([int(cfg.seed), 1])  # separate, so the epoch order matches a run without pauses
     order = rng.permutation(len(data))
     n_val = int(round(val_fraction * len(data))) if len(data) >= 10 else 0
     val_idx, train_idx = order[:n_val].tolist(), order[n_val:].tolist()
@@ -182,7 +199,7 @@ def train_bc(
         perm = rng.permutation(train_idx).tolist()
         for start in range(0, len(perm), int(bcfg.batch_episodes)):
             idx = perm[start : start + int(bcfg.batch_episodes)]
-            batch = data.batch(idx, device)
+            batch = data.batch(idx, device, pause_rng)
             v = model.init_state(len(idx))
             for s, e in clocks.windows(batch["x16"].shape[1], int(bcfg.tbptt_core_steps)):
                 if not bool(batch["mask"][:, s:e].any()):
@@ -233,6 +250,8 @@ def train_bc(
         "source": cfg.connectome.source,
         "seed": int(cfg.seed),
         "cache": str(Path(cache_dir).resolve()),
+        **({"pauses": {"bank": str(sampler.bank.dir.resolve()), "per_episode": sampler.per_episode, "p": sampler.p}}
+           if sampler else {}),
     }
     save("model.pt")
     (out_dir / "history.json").write_text(json.dumps(history))
