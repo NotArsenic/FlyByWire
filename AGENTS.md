@@ -78,6 +78,8 @@ After modifying code, run `graphify update .` to refresh the knowledge graph (gi
 - No defensive code for situations that cannot happen. No try/except that just swallows errors,
   no over-general helper layers, no single-use abstractions "for flexibility".
 - Plain names (`n_steps`, `hexals`), not `process_data_helper`. Match the surrounding code.
-- Commit messages and `docs/DECISIONS.md` entries read like terse notes from the author:
-  what changed and why, no marketing words, no emoji, no bullet-padding.
+- Commit messages are 1-2 crisp lines (`git commit -m "..."`): no body paragraphs, no bullet
+  lists, no AI attribution trailers.
+- `docs/DECISIONS.md` entries read like terse notes from the author: what changed and why, no
+  marketing words, no emoji, no bullet-padding.
 - README text: direct and specific, no filler ("robust", "seamless", "leverage", "comprehensive").

@@ -91,3 +91,11 @@ No other metric is added after the fact.
 
 Every per-run value, mean, sd, min and max per cell, and every p, in
 `runs/sweep_uniform/stats.json`, and a DECISIONS entry with the verdict on each hypothesis.
+
+## Execution note (2026-10-20, not an amendment)
+
+Claude Code stopped the sweep and a concurrent PPO run when the machine ran low on memory, with 7 of
+18 runs trained. The sweep was restarted alone; finished runs were kept, interrupted ones retrained
+from scratch with the same seed (training is deterministic). The pause evaluation of
+uniform_rewire_s10 had failed on CUDA OOM while post.sh marked the run done; it was rerun with the
+same command before scripts/sweep_uniform_stats.py was run. Nothing else changed.

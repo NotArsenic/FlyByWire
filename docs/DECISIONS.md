@@ -633,3 +633,59 @@ runs at 76.0, 45.0, 76.5%). The table now gives the per-seed rates and a t inter
 seeds. The D38 "rewired flies better" p of 0.015 was already a run-level test (exact permutation,
 12 runs, 924 relabelings); permuting mask labels only within readout gives the same 0.015 (6 of
 400). It stays post hoc; docs/protocols/sweep_uniform_pauses.md tests it on fresh seeds (H3).
+
+## 2026-10-19 — D41. Lesions in closed loop on the demo candidate
+
+scripts/eval_lesions.py, real_anatomical_s5 (model_best.pt), the 200 held-out seeds 10000-10199,
+lesion on for the whole flight. Ring on the anatomical layout after a 50-step washout; "gain" is the
+bump's turn against the drone's turn over 0.5 s windows with more than 20 deg of turning.
+
+| lesion | success [Wilson 95] | heading err (deg) | EPG rate | bump share | gain |
+|---|---|---|---|---|---|
+| none | 79.5% [73.4, 84.5] | 5.8 | 1.18 | 0.46 | 1.12 |
+| EPG | 0.0% [0.0, 1.9] | 59.7 | 0 | 0 | 0 |
+| PEN | 82.5% [76.6, 87.1] | 11.0 | 1.25 | 0.47 | 1.23 |
+| D7 | 5.0% [2.7, 9.0] | 6.7 | 1.33 | 0.42 | 0.81 |
+
+EPG: the bump is gone, and so is steering. The action becomes nearly constant (sd 0.03-0.05 per
+dim against 0.14-0.29 intact) with a steady left turn and drift, and every flight ends on a side
+wall after ~1.5 s. PFL3, the only thing the actor reads, gets its input through EPG in this
+network, so the policy is not a reactive map from vision to action that bypasses the compass.
+
+PEN: the prediction that a PEN lesion freezes the compass is wrong for this model. The bump stays,
+keeps its share and follows the turns (gain 1.23); heading error doubles and flight is unchanged.
+Self-motion reaches EPG continuously through the ER input, so the heading is driven by vision
+rather than shifted by PEN. That fits D37/D39: no internal integrator holds the heading.
+
+D7: the compass is fine (error 6.7 deg, gain 0.81, bump a little broader) but the drone flies
+faster (forward command mean +0.68 normalised against +0.09) and hits walls and obstacles.
+D7 matters for the motor side here, not for the ring. runs/lesions/real_anatomical_s5.
+
+## 2026-10-20 — D42. Uniform holding headings; last real-vs-rewired sweep
+
+expert.maneuvers.targets=uniform: the far heading of a maneuver is drawn from U[-180, 180) and held
+(hold_s [1, 3], wait_s [0.5, 2], DART noise as D38). 6/1000 expert collisions, as for the old
+maneuvers. Protocol docs/protocols/sweep_uniform_pauses.md, written and committed before collection.
+Anatomical readout, pause training with 1-3 s holds; uniform arm real/rewired seeds 10-15 on
+data/cache_uniform, control arm seeds 10-12 on data/cache_dart (old maneuvers), all scored on the
+uniform test set. Mean (sd) per cell:
+
+| cell | drift 2 s (deg) | field rms (deg/s) | bump share | closed loop |
+|---|---|---|---|---|
+| uniform real (6) | 9.54 (0.51) | 3.47 (0.71) | 0.285 (0.064) | 64.3% (25.0) |
+| uniform rewired (6) | 9.78 (0.84) | 4.14 (1.19) | 0.286 (0.094) | 82.9% (8.2) |
+| control real (3) | 9.74 (0.53) | 4.37 (1.17) | 0.364 (0.057) | |
+| control rewired (3) | 9.15 (0.17) | 5.06 (0.61) | 0.214 (0.049) | |
+
+H1 not supported: field rms 0.91 deg/s lower with uniform holds, p 0.074, and a stable point near
++-85 deg is still there in 8 of 12 uniform runs (5 of 6 control); every run keeps one near 0. Holding
+headings everywhere flattens the field a little but does not turn the stable points into a ring.
+H2 not supported: drift p 0.55, field rms p 0.26, bump share p 0.996 (real - rewired -0.001); Holm
+p >= 0.78. H3 does not replicate at p < 0.05: rewired flies better again (+18.6 points, p 0.119),
+same direction as D38 with a spread driven by two weak real seeds (26%, 46%).
+
+That ends the wiring comparison: across the turning, DART and uniform-hold data, under the same
+training, the FlyWire mask has not beaten a degree-preserving rewire on any pre-registered measure.
+One scoring step (uniform_rewire_s10, pause eval) had failed on CUDA OOM six times while post.sh
+marked the run done anyway; it was rerun alone with the same command before the tests.
+runs/sweep_uniform, stats.json.
