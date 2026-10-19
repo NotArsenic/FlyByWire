@@ -27,7 +27,7 @@ def short_cfg():
 
 def test_core_step_matches_run_on_cached_episode(cfg, model):
     try:
-        cache = T4T5Cache(data_dir(cfg) / "cache")
+        cache = T4T5Cache(data_dir(cfg) / "cache_dart_test")
     except FileNotFoundError as e:
         pytest.skip(str(e))
     clocks = clocks_from_cfg(cfg)

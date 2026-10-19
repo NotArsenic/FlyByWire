@@ -6,8 +6,9 @@ model of the fly optic lobe feeding a recurrent network wired like the FlyWire c
 <!-- Demo: lesion video (scripts/render_lesion_video.py) goes here once available, e.g.
 <p align="center"><img src="docs/media/lesion_demo.gif" width="720"></p> -->
 
-> **Status:** env, DART expert data, BC + DAgger, real-vs-rewired sweeps and time-freeze pause training are done. Gates 1 and 2 pass; Gate 3 fails (bump share at most 0.36 against 0.5). PPO, dashboard and video are stubs.
-> PPO, dashboard and video are stubs; nothing has been trained yet.
+> **Status:** env, DART expert data, BC + DAgger, real-vs-rewired sweeps and time-freeze pause
+> training are done. Gates 1 and 2 pass; Gate 3 fails (bump share at most 0.36 on the final data,
+> against 0.5). PPO fine-tuning is being implemented; dashboard and lesion video come after it.
 
 ## What is reused vs. built
 
@@ -21,9 +22,11 @@ Physics and the quadcopter model come from gym-pybullet-drones (Panerati et al.,
   fixed ego-motion flow templates and calibrated preferred directions;
 - a **FlyWire-masked recurrent central complex** (ER, EPG, PEN, PEG, Δ7, PFL3): one rate population
   whose only neuron-to-neuron path is the connectome mask;
-- **BC → PPO training** (behavior cloning from a scripted expert, then PPO with a KL anchor);
+- **BC training** (behavior cloning from a scripted expert with DART noise and DAgger; PPO
+  fine-tuning with a KL anchor to the BC policy is being implemented);
 - **lesioning** of cell types at inference time;
-- a **null-model comparison**: real connectome vs. a directed degree-preserving rewire (3 seeds each).
+- a **null-model comparison**: real connectome vs. a directed degree-preserving rewire, with
+  protocols written before training (10 seeds per mask on the turning data, 6 on the DART data).
 
 ## Architecture
 
@@ -134,10 +137,14 @@ al., 2024). Downloading may require signing in to FlyWire Codex and accepting it
 | conda env | 8–12 GB |
 | flyvis pretrained models | 10 MB download (measured); 111 MB after first use (flyvis builds a 101 MB connectome cache) |
 | FlyWire tables | up to ~2 GB |
-| expert trajectories (300 × hexals fp16) | 127 MB measured (+ 18 MB raw frames for 20 episodes) |
-| T4/T5 cache (300 × 1000 × 8 × 721 fp16) | 3.46 GB measured |
+| expert trajectories (hexals fp16) | 427 MB for 1000 DART episodes + 210 MB for 600 DAgger episodes, measured |
+| T4/T5 cache (1600 episodes × 1000 × 8 × 721 fp16) | 17 GB measured (`data/cache_dart_agg2`); 1.1 GB per 100-episode test cache |
+| pause bank (4000 held-frame entries) | ~6 GB |
 | logs, checkpoints, videos | 2–5 GB |
-| **total** | **~20–30 GB; keep 50 GB free** |
+| **total** | **~40–50 GB; keep 50 GB free** |
+
+Caches and pause banks are rebuilt from the stored hexals (`scripts/build_cache.py`,
+`scripts/build_pause_bank.py`), so superseded ones can be deleted.
 
 ## Quickstart
 
@@ -159,7 +166,7 @@ make params      # effective trainable parameters (W counted on-mask only)
 |---|---|---|---|
 | 1 | Can frozen flyvis be stepped frame by frame with carried state, fast enough? | (a) one call vs. (b) per-frame with state agree to ≤ 1e-5 relative, **and** ≥ 100 batched steps/s at B = 12 | **PASS** (2.7e-7; 634 steps/s) |
 | 2 | Is yaw rate linearly decodable from T4/T5 in the corridor? | ridge regression T4/T5 → yaw rate on held-out trajectories, R² > 0.5 | **PASS** (test R² 0.787, 60 held-out episodes) |
-| 3 | Does the trained core carry heading in EPG? | heading decode from EPG R² > 0.8 **and** the ring shows a single bump rotating with yaw (anatomical EB layout: first-harmonic share > 0.5, bump-heading alignment > 0.8) | **FAIL** (R² 0.97 and alignment 0.98 pass with the anatomical readout; bump share at most 0.45) |
+| 3 | Does the trained core carry heading in EPG? | heading decode from EPG R² > 0.8 **and** the ring shows a single bump rotating with yaw (anatomical EB layout: first-harmonic share > 0.5, bump-heading alignment > 0.8) | **FAIL** (R² and alignment pass with the anatomical readout; best bump share 0.45 on the pre-DART turning data, 0.36 on the final DART data) |
 
 ## Repo layout
 
@@ -187,19 +194,24 @@ docs/DECISIONS.md           dated decisions and every deviation from the spec
 Latest: BC on 1000 turning-expert episodes with DART execution noise plus two DAgger rounds (1600
 episodes), scored on 100 held-out episodes; mean ± sd over seeds (D38). "learned" is the free
 2 × 51 heading readout, "anatomical" the fixed population vector over EPG EB angles. Bump share is
-on the anatomical ring (0.5 ≈ a 53° FWHM bump, 0.3 ≈ 30°). Closed loop: 200 held-out episodes per
-seed, seeds 0-2; the expert flies 100%.
+on the anatomical ring (0.5 ≈ a 53° FWHM bump, 0.3 ≈ 30°). Closed loop: seeds 0-2 of each
+condition, 200 held-out episodes per run; the expert flies 100%. The seed is the unit: the
+interval is the t interval over the three per-seed rates (n = 3, so it is wide; capped at 100%), not a binomial
+interval over 600 episodes, which would ignore the spread between seeds.
 
-| Mask / readout | Seeds | Heading R² | Bump share | Closed-loop success [95% CI] |
-|---|---|---|---|---|
-| real / learned | 0-2 | 0.907 | 0.14 ± 0.06 | 65.8% [61.9, 69.5] |
-| rewire / learned | 0-2 | 0.919 | 0.17 ± 0.04 | 87.0% [84.1, 89.5] |
-| real / anatomical | 0-5 | 0.920 | 0.32 ± 0.04 | 68.8% [65.0, 72.4] |
-| rewire / anatomical | 0-5 | 0.923 | 0.32 ± 0.05 | 80.2% [76.8, 83.2] |
+| Mask / readout | Seeds | Heading R² | Bump share | Closed loop per seed (s0, s1, s2) | Mean [95% CI over seeds] |
+|---|---|---|---|---|---|
+| real / learned | 0-2 | 0.907 | 0.14 ± 0.06 | 76.0, 45.0, 76.5% | 65.8% [21, 100] |
+| rewire / learned | 0-2 | 0.919 | 0.17 ± 0.04 | 83.0, 88.5, 89.5% | 87.0% [78, 96] |
+| real / anatomical | 0-5 | 0.920 | 0.32 ± 0.04 | 61.0, 78.5, 67.0% | 68.8% [47, 91] |
+| rewire / anatomical | 0-5 | 0.923 | 0.32 ± 0.05 | 75.0, 87.0, 78.5% | 80.2% [65, 96] |
 
-Real and rewired wiring give the same bump share (p 0.998, protocol in
-`docs/protocols/sweep_dart_agg2.md`); an earlier real > rewired lead (D35) did not replicate (D36,
-D38). No run reaches Gate 3's 0.5. The rewired mask flies better (post hoc, p 0.015). Training
+Real / anatomical seeds 3-5 were also flown (73.0, 59.0, 79.5%). Real and rewired wiring give the
+same bump share (p 0.998, protocol in `docs/protocols/sweep_dart_agg2.md`); an earlier real >
+rewired lead (D35) did not replicate (D36, D38). No run reaches Gate 3's 0.5. The rewired mask
+flies better: 83.6% vs 67.3% over the six closed-loop runs per mask, exact permutation test with
+the run as the unit (mask labels shuffled within readout, 400 relabelings) p 0.015. That test was
+chosen after seeing the data, so it is a lead to replicate, not a finding. Training
 with time-freeze pauses (D39) roughly halves heading drift through 1-2 s of no visual motion,
 with real and rewired again indistinguishable.
 

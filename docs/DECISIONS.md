@@ -619,3 +619,17 @@ real, 18.2 -> 51.1 rewired), unexplained. Real and rewired don't separate (drift
 share 0.37 vs 0.30, within seed spread; Gate 3 still fails). Persistence is now trained, so only
 real vs rewired under the same training is a comparison. The pilot ran on the pre-DART turning
 data; the next run should use data/cache_dart_agg2 with longer holds. runs/step4_pilot.
+
+## 2026-10-19 — D40. Cache cleanup; closed-loop intervals over seeds
+
+Deleted data/cache (300 plain episodes), cache_turns, cache_dart, cache_dagger_r1_off and
+pause_bank_turns (44 GB). The hexals they were built from are kept, so each is one build_cache.py /
+build_pause_bank.py away; cache_dart_agg2 (the demo candidate's training data) and the test caches
+stay. test_closed_loop now reads cache_dart_test, since data/cache is gone.
+
+The README's closed-loop intervals were Wilson intervals over 600 pooled episodes, which treats
+episodes from the same network as independent and ignores the spread between seeds (real/learned
+runs at 76.0, 45.0, 76.5%). The table now gives the per-seed rates and a t interval over the three
+seeds. The D38 "rewired flies better" p of 0.015 was already a run-level test (exact permutation,
+12 runs, 924 relabelings); permuting mask labels only within readout gives the same 0.015 (6 of
+400). It stays post hoc; docs/protocols/sweep_uniform_pauses.md tests it on fresh seeds (H3).
