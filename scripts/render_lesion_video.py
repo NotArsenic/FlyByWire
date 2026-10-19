@@ -57,12 +57,13 @@ def main(argv=None) -> int:
     ap.add_argument("--seed", type=int, default=10003)
     ap.add_argument("--seconds", type=float, default=20.0)
     ap.add_argument("--schedule", nargs="*", default=["PEN:5-9", "D7:11-14", "EPG:16-19"])
+    ap.add_argument("overrides", nargs="*", help="key=value on the corridor, e.g. a curriculum level")
     ap.add_argument("--lesion-report", default=None,
                     help="lesions.json for the ring frame (default runs/lesions/<run>/lesions.json)")
     args = ap.parse_args(argv)
 
     schedule = parse_schedule(args.schedule)
-    flight = Flight(args.ckpt, args.seed, overrides=[f"env.episode_seconds={args.seconds}"])
+    flight = Flight(args.ckpt, args.seed, overrides=[f"env.episode_seconds={args.seconds}", *args.overrides])
     report = Path(args.lesion_report or REPO_ROOT / "runs/lesions" / Path(args.ckpt).parent.name / "lesions.json")
     if not flight.align_ring(report):
         print(f"no {report}: heading arrows are not aligned to the ring")
