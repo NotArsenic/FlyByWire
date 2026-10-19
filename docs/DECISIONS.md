@@ -689,3 +689,27 @@ training, the FlyWire mask has not beaten a degree-preserving rewire on any pre-
 One scoring step (uniform_rewire_s10, pause eval) had failed on CUDA OOM six times while post.sh
 marked the run done anyway; it was rerun alone with the same command before the tests.
 runs/sweep_uniform, stats.json.
+
+## 2026-10-20 — D43. PPO fine-tuning does not beat the BC policy
+
+flybywire/train/ppo.py from real_anatomical_s5 (BC, 79.5% on test seeds 10000-10199): KL anchor to
+the frozen BC policy, aux heading loss on, critic warm-up with the actor frozen, time-limit ends
+bootstrapped from final_obs. Three setups, all scored on deterministic flights (action mean):
+
+- collision -10, exploration std 0.22, rollouts of 128 decisions: test 76.0% at update 20, 70.0%
+  at 80. The policy flew faster (mean progress 9.27 -> 9.61 m) and crashed more: the progress
+  reward outweighed a -10 crash.
+- collision -100 and checkpoints picked on 100 validation seeds (20000..), never the test seeds:
+  validation 75% (BC), 74, 64, 63% at updates 39, 79, 119.
+- exploration std 0.1, rollouts of 256 decisions, KL floor 0.05: validation 75% (BC), 76, 74, 73,
+  71% at updates 19-99. The best checkpoint (update 19) scores 75.0% on the test seeds.
+
+Success of the noisy training flights held at ~75-82% throughout while the action mean got worse:
+PPO improves the stochastic policy, and the deterministic one drifts away from BC (KL to BC up to
+0.3-0.4) without gaining. Stopped well inside the 3-day budget; the BC policy stays the model of
+record. reward.collision is -100 and ppo.log_std -2.3 from here on.
+
+Side issues: a training env opened in a pybullet GUI died when its window was closed and took the
+run with it, so the live view's chase camera is now a copy of env 0 in the viewer's own process.
+PPO with its validation envs, three BC trainings and closed-loop scoring together ran the 31 GB
+machine out of memory; they now run one after another. runs/ppo.
