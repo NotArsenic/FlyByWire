@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from omegaconf import OmegaConf
 
 from flybywire.clocks import clocks_from_cfg
 from flybywire.config import data_dir, load_config
 from flybywire.data.trajectories import Trajectory, trajectory_path
 from flybywire.envs.corridor import CorridorEnv, body_to_world_velocity, denormalize_action, normalize_action
-from flybywire.envs.expert import ScriptedExpert, surface_distance, turn_profile
+from flybywire.envs.expert import ExecNoise, ScriptedExpert, surface_distance, turn_profile
 from flybywire.envs.vec import make_vec_env
 
 
@@ -84,6 +85,36 @@ def test_wall_textures_render(tmp_path):
         env.close()
     assert (tmp_path / "textures" / "checker_256.png").exists()
     assert np.abs(frames["none"].astype(int) - frames["checker"]).mean() > 1.0
+
+
+def test_obstacle_texture_is_off_without_the_key(tmp_path):
+    base = load_config(overrides=[f"paths.data_dir={tmp_path}"])
+    old = load_config(overrides=[f"paths.data_dir={tmp_path}"])
+    del old.env["obstacle_texture"]
+    checker = load_config(overrides=[f"paths.data_dir={tmp_path}", "env.obstacle_texture=checker"])
+    frames = {}
+    for name, cfg in (("none", base), ("old", old), ("checker", checker)):
+        env = CorridorEnv(cfg, seed=0)
+        frames[name], _ = env.reset(seed=3)
+        env.close()
+    np.testing.assert_array_equal(frames["old"], frames["none"])
+    assert (frames["checker"] != frames["none"]).any()
+
+
+def test_exec_noise_is_seeded_clipped_and_scaled_per_episode():
+    spec = OmegaConf.create({"sd": [0.1, 0.25, 0.0, 0.8], "tau_s": 0.5, "scale": [0.0, 1.0]})
+    base = np.zeros(4, np.float32)
+
+    def run(seed, n=4000):
+        noise = ExecNoise(spec, 0.04, seed)
+        return noise, np.stack([noise(base) for _ in range(n)])
+
+    (n1, a), (_, b), (_, c) = run(1), run(1), run(2)
+    np.testing.assert_array_equal(a, b)
+    assert not np.array_equal(a, c)
+    assert np.abs(a).max() <= 1.0 and np.all(a[:, 2] == 0.0)
+    # stationary sd of the yaw channel is the spec's times this episode's scale (clipping aside)
+    assert a[:, 3].std() == pytest.approx(n1.sd[3], rel=0.25)
 
 
 @pytest.mark.parametrize("seed", [0, 1])

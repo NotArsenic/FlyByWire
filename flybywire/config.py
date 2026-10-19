@@ -16,8 +16,9 @@ from flybywire.clocks import Clocks, clocks_from_cfg
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = REPO_ROOT / "configs" / "default.yaml"
 
+TEXTURES = {"none", "checker", "noise"}
 ENUMS = {
-    "env.wall_texture": {"none", "checker", "noise"},
+    "env.wall_texture": TEXTURES,
     "env.renderer": {"auto", "egl", "tiny"},
     "vision.backend": {"flyvis", "farneback"},
     "lptc.mode": {"frozen", "gains", "full"},
@@ -63,6 +64,9 @@ def validate_config(cfg: DictConfig) -> Clocks:
         v = need(key)
         if v is not None and v not in allowed:
             errors.append(f"{key}={v!r} not in {sorted(allowed)}")
+
+    if obstacle_texture(cfg) not in TEXTURES:
+        errors.append(f"env.obstacle_texture={obstacle_texture(cfg)!r} not in {sorted(TEXTURES)}")
 
     clocks = None
     try:
@@ -120,6 +124,11 @@ def validate_config(cfg: DictConfig) -> Clocks:
     if errors:
         raise ConfigError("invalid config:\n  - " + "\n  - ".join(errors))
     return clocks
+
+
+def obstacle_texture(cfg: DictConfig) -> str:
+    """env.obstacle_texture; configs from before the key existed have flat grey obstacles."""
+    return str(OmegaConf.select(cfg, "env.obstacle_texture", default="none"))
 
 
 def config_hash(cfg: DictConfig, keys: Sequence[str] | None = None) -> str:

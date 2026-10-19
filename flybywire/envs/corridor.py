@@ -36,7 +36,7 @@ from gymnasium import spaces
 from gymnasium.utils import seeding
 
 from flybywire.clocks import clocks_from_cfg
-from flybywire.config import ACTION_KEYS, data_dir
+from flybywire.config import ACTION_KEYS, data_dir, obstacle_texture
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +50,7 @@ WALL_SEGMENT = 2.5            # square wall panels, so textures aren't stretched
 CAMERA_OFFSET = 0.03          # m, ahead of the arms
 NEAR, FAR = 0.05, 40.0
 GRAY = np.array([0.299, 0.587, 0.114])
+TEXTURED_OBSTACLE_GRAY = 0.6   # darker than the walls, so the silhouette keeps its contrast
 
 
 def action_bounds(limits) -> tuple[np.ndarray, np.ndarray]:
@@ -159,6 +160,7 @@ class CorridorEnv(gym.Env):
         self.height = float(e.corridor.height_m)
         self.n_obstacles = int(e.n_obstacles)
         self.texture = str(e.wall_texture)
+        self.obstacle_texture = obstacle_texture(cfg)
         self.n_decisions = self.clocks.n_decisions(float(e.episode_seconds))
         self.limits = cfg.action.limits
         self.weights = {k: float(v) for k, v in cfg.reward.items()}
@@ -237,14 +239,18 @@ class CorridorEnv(gym.Env):
         self._box(cid, [L / 2, 0, H + t], [L / 2, W / 2 + 2 * t, t], 0.55, plain)
         for x in (-t, L + t):
             self._box(cid, [x, 0, H / 2], [t, W / 2 + 2 * t, H / 2], 0.4, plain)
+        cyl_gray, box_gray, obstacle_tex = 0.25, 0.35, plain
+        if self.obstacle_texture != "none":
+            obstacle_tex = p.loadTexture(_texture_file(self.obstacle_texture, self._texture_dir), physicsClientId=cid)
+            cyl_gray = box_gray = TEXTURED_OBSTACLE_GRAY
         for kind, x, y, hx, hy in self.obstacles:
             if kind == 0:
                 col = p.createCollisionShape(p.GEOM_CYLINDER, radius=hx, height=H, physicsClientId=cid)
-                vis = p.createVisualShape(p.GEOM_CYLINDER, radius=hx, length=H, rgbaColor=[0.25, 0.25, 0.25, 1],
+                vis = p.createVisualShape(p.GEOM_CYLINDER, radius=hx, length=H, rgbaColor=[cyl_gray] * 3 + [1],
                                           physicsClientId=cid)
-                self._body(cid, col, vis, [x, y, H / 2], plain)
+                self._body(cid, col, vis, [x, y, H / 2], obstacle_tex)
             else:
-                self._box(cid, [x, y, H / 2], [hx, hy, H / 2], 0.35, plain)
+                self._box(cid, [x, y, H / 2], [hx, hy, H / 2], box_gray, obstacle_tex)
 
     def _state(self) -> dict:
         av = self._aviary

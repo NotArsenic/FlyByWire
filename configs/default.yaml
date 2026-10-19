@@ -15,6 +15,7 @@ env:
   corridor: {length_m: 30, width_m: 3.0, height_m: 2.5}
   n_obstacles: 8
   wall_texture: none       # none | checker | noise
+  obstacle_texture: none   # same choices; a config without the key has none
   renderer: tiny           # auto | egl | tiny; EGL draws shadow-map artefacts here (D29)
 vision:
   backend: flyvis          # flyvis | farneback
@@ -85,6 +86,7 @@ expert:                    # scripted expert (privileged state); initial values
   altitude_gain: 1.0
   wander_deg: 8            # sd of a seeded OU heading wander, for state diversity
   wander_tau_s: 1.0
+  exec_noise: null         # DART, only read by collect_expert: {sd: [4, normalised], tau_s, scale: [lo, hi]}
   maneuvers:               # turn on the spot now and then, then back to heading 0; remove for the plain expert
     angles_deg: [90, 135, 180, 270, 360]  # excursion size, sign random; 270 and 360 end as full rotations
     wait_s: [1.0, 3.0]     # idle time before the next maneuver may start

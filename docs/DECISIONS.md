@@ -560,3 +560,34 @@ runs away, and the velocity field has stable points rather than a continuum: mul
 training headings, not a ring attractor. Real masks have shorter EPG and D7 time constants (34 vs
 54 and 34 vs 91 ms, n = 6 each, uncorrected p 0.03 and 0.002). scripts/diagnose_darkness.py,
 scripts/diagnose_lptc_grey.py, scripts/plot_time_constants.py, runs/darkness_diag.
+
+## 2026-10-19 — D38. DART noise instead of textures; two DAgger rounds; real vs rewired again
+
+Closed-loop failures in the D35 runs (600 episodes per condition) were mostly late obstacle
+avoidance (onset ~1.5 m, expert 2.1 m; 195/600 for real/learned) and, in the bad anatomical runs,
+a +27 deg yaw bias into the +y wall (304/600 for real/anatomical), not heading drift. A
+160-episode texture pilot (ridge and MLP probes, runs/texture_pilot) showed no gain from textured
+walls or obstacles, and wall textures lowered lateral-position and heading decoding. Not adopted;
+env.obstacle_texture stays (default none) so the pilot can be rerun.
+
+Instead expert.exec_noise (DART, Laskey et al. 2017): OU noise on the executed action (sd
+0.1/0.25/0/0.8 normalised, tau 0.5 s, per-episode scale U(0,1)), label is the clean expert action.
+data/expert_dart (seeds 0-999) and expert_dart_test (2000-2099), untextured. Real/learned seeds
+0-2: 52.8% -> 76.2% closed loop. Gate 2 on it is 0.615 (was 0.880), not from textures: T4/T5 lag
+yaw rate by ~80 ms and DART yaw rate changes 3.4x faster per frame, so yaw rate 80 ms ago explains
+0.71 of the current one (0.94 before); ridge against the 80 ms-shifted target gives 0.83 (0.92).
+Decoded heading test R^2 is ~0.92 instead of 0.975.
+
+DAgger from real/learned seed 0 (plain labels): 59.5% -> 75.0% -> 76.0% (n = 200); wall hits
+vanish, obstacle hits stay ~48. Stopped after round 2. Seed 0 was the weakest reference seed
+(seeds 1, 2: 87.5, 81.5% without DAgger) and real/learned s0-2 on the aggregate average 65.8%, so a
+gain over DART alone isn't shown.
+
+Sweep on data/cache_dart_agg2 (1600 episodes), protocol docs/protocols/sweep_dart_agg2.md:
+anatomical seeds 0-5 per mask (6-9 cut by the protocol's time rule after a crash cascade forced a
+retrain wave). Bump share real 0.322 vs rewired 0.322, p 0.998; the D36 lead is gone. No run passes
+Gate 3 (best 0.363). R^2 0.92 and ring alignment 0.95 everywhere. Closed loop: the anatomical
+readout now flies like the learned one (74.5% vs 76.4%) and its wall failure is gone. The rewired
+mask flies better than the real one (83.6% vs 67.3%, post hoc p 0.015). Demo candidate
+real_anatomical_s5: share 0.363, R^2 0.932, 79.5% closed loop (picked from six, so optimistic).
+runs/sweep_dart, runs/gate3_dart, runs/dagger_dart, runs/failure_breakdown.

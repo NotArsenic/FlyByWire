@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from flybywire.clocks import Clocks
-from flybywire.config import ConfigError, config_hash, load_config
+from flybywire.config import ConfigError, config_hash, load_config, obstacle_texture, validate_config
 
 
 def test_default_ratios():
@@ -79,11 +79,19 @@ def test_overrides_apply():
         "connectome.lesion_groups=[EPG,FOO]",
         "action.limits.yaw_rate=[1.0,-1.0]",
         "env.episode_seconds=10.01",
+        "env.obstacle_texture=plaid",
     ],
 )
 def test_invalid_config_raises(override):
     with pytest.raises(ConfigError):
         load_config(overrides=[override])
+
+
+def test_config_without_obstacle_texture_is_valid_and_means_none():
+    cfg = load_config()
+    del cfg.env["obstacle_texture"]
+    validate_config(cfg)
+    assert obstacle_texture(cfg) == "none"
 
 
 def test_config_hash_stable_and_sensitive():

@@ -5,6 +5,7 @@
 * :func:`angular_error_deg`: mean absolute wrapped angular error in degrees between
   ``atan2(sin, cos)`` of prediction and target.
 * :func:`lagged_heading_r2`: the same R^2 with the target shifted back in time.
+* :func:`wilson_interval`: confidence interval for a success rate.
 """
 
 from __future__ import annotations
@@ -53,3 +54,12 @@ def lagged_heading_r2(preds, targets, lags) -> list[float]:
         )
         for lag in lags
     ]
+
+
+def wilson_interval(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """Wilson score interval for k successes in n trials (95% by default)."""
+    p = k / n
+    scale = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / scale
+    half = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / scale
+    return float(centre - half), float(centre + half)

@@ -28,7 +28,7 @@ import torch
 from omegaconf import OmegaConf
 
 from flybywire.clocks import clocks_from_cfg
-from flybywire.config import ACTION_KEYS, config_hash, data_dir
+from flybywire.config import ACTION_KEYS, config_hash, data_dir, obstacle_texture
 from flybywire.data.trajectories import STATE_KEYS, Trajectory, trajectory_path, wrap_angle
 
 ENV_KEYS = ["clocks", "env", "action", "expert", "reward"]
@@ -152,6 +152,8 @@ class Episode:
     label: np.ndarray  # (K, 4) scripted expert on the visited states
     heading_err_deg: np.ndarray | None = None  # (T,)
     file: str | None = None
+    state: dict | None = None  # STATE_FIELDS per frame, (T, ...)
+    obstacles: np.ndarray | None = None  # (n, 5) as in the env's reset info
 
     @property
     def n_decisions(self) -> int:
@@ -254,7 +256,7 @@ def _finish(r: Rollout, final: dict, cfg, clocks, record_dir, meta) -> Episode:
     if "heading" in r.outs[0]:
         heading_err = heading_error_deg(np.concatenate([o["heading"] for o in r.outs]), state["rel_yaw"])
     ep = Episode(r.index, r.seed, reason, float(final["x_progress"]), bool(final["collision"]), action, label,
-                 heading_err)
+                 heading_err, state=state, obstacles=np.asarray(r.infos[0]["obstacles"], dtype=float))
     if record_dir is not None:
         path = trajectory_path(record_dir, r.index)
         Trajectory(
@@ -265,7 +267,8 @@ def _finish(r: Rollout, final: dict, cfg, clocks, record_dir, meta) -> Episode:
             collided=ep.collided,
             yaw_0=float(r.infos[0]["yaw_0"]),
             state={k: state[k] for k in STATE_KEYS},
-            meta={"seed": r.seed, "wall_texture": str(cfg.env.wall_texture), "config_hash": config_hash(cfg, ENV_KEYS),
+            meta={"seed": r.seed, "wall_texture": str(cfg.env.wall_texture), "obstacle_texture": obstacle_texture(cfg),
+                  "config_hash": config_hash(cfg, ENV_KEYS),
                   "termination": reason, "x_progress": ep.x_progress,
                   "action_mse_policy_vs_label": float(np.mean((action - label) ** 2)), **(meta or {})},
         ).save(path, clocks)

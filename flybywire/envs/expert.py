@@ -54,6 +54,25 @@ def turn_profile(angle: float, peak: float, accel: float, t: float) -> tuple[flo
     return angle - 0.5 * accel * (t_end - t) ** 2, accel * (t_end - t), t_end
 
 
+class ExecNoise:
+    """OU noise added to the action that is executed, while the label stays the expert's own (DART).
+
+    The states it leads to are ones the clean expert never visits, each labelled with what the
+    expert does there. ``spec`` is expert.exec_noise: sd per action dim (normalised units), tau_s,
+    and the range the per-episode multiplier of sd is drawn from, so some episodes stay nearly clean.
+    """
+
+    def __init__(self, spec, dt: float, seed: int):
+        self.rng = np.random.default_rng([seed, 2])
+        self.sd = np.asarray(spec.sd, dtype=float) * self.rng.uniform(*spec.scale)
+        self.rate = dt / float(spec.tau_s)
+        self.x = np.zeros(len(self.sd))
+
+    def __call__(self, action: np.ndarray) -> np.ndarray:
+        self.x += -self.rate * self.x + self.sd * np.sqrt(2 * self.rate) * self.rng.standard_normal(len(self.sd))
+        return np.clip(action + self.x, -1.0, 1.0).astype(np.float32)
+
+
 class ScriptedExpert:
     def __init__(self, cfg, seed: int | None = None):
         x = cfg.expert

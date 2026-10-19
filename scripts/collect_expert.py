@@ -5,6 +5,9 @@ Episode i uses seed --seed + i for the corridor layout and the expert's wander. 
 env and expert and send back raw frames; the main process converts them to hexals with BoxEye
 and writes the format in flybywire/data/trajectories.py.
 
+With expert.exec_noise set, the executed action carries OU noise but the stored label is the
+expert's own action (DART); see ExecNoise in flybywire/envs/expert.py.
+
 Window k (the reset pre-roll for k = 0) is the input to decision k. The window returned by the
 last step has no decision, so it is dropped and every file has T = 4K frames.
 
@@ -24,9 +27,10 @@ import time
 from pathlib import Path
 
 import numpy as np
+from omegaconf import OmegaConf
 
 from flybywire.clocks import clocks_from_cfg
-from flybywire.config import config_hash, data_dir, load_config
+from flybywire.config import config_hash, data_dir, load_config, obstacle_texture
 from flybywire.data.trajectories import STATE_KEYS, Trajectory, list_trajectories, trajectory_path
 
 ENV_KEYS = ["clocks", "env", "action", "expert", "reward"]
@@ -43,17 +47,19 @@ def _init_worker(overrides: list[str]) -> None:
 
 
 def run_episode(seed: int) -> dict:
-    from flybywire.envs.expert import ScriptedExpert
+    from flybywire.envs.expert import ExecNoise, ScriptedExpert
 
     cfg, env = _worker["cfg"], _worker["env"]
     expert = ScriptedExpert(cfg, seed=seed)
+    spec = OmegaConf.select(cfg, "expert.exec_noise", default=None)
+    noise = ExecNoise(spec, clocks_from_cfg(cfg).dt_control, seed) if spec else None
     frames, info = env.reset(seed=seed)
     expert.reset(info)
     windows, infos, actions = [frames], [info], []
     while True:
         a = expert.act(info)
         actions.append(a)
-        frames, _, terminated, truncated, info = env.step(a)
+        frames, _, terminated, truncated, info = env.step(a if noise is None else noise(a))
         if terminated or truncated:
             break
         windows.append(frames)
@@ -105,6 +111,7 @@ def main(argv=None) -> int:
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     eye = BoxEye(int(cfg.vision.boxeye.extent), int(cfg.vision.boxeye.kernel_size), device=device)
     env_hash = config_hash(cfg, ENV_KEYS)
+    exec_noise = OmegaConf.select(cfg, "expert.exec_noise", default=None)
     print(f"collecting {n} episodes (seeds {seed0}..{seed0 + n - 1}) with {args.workers} workers -> {out}")
 
     t0 = time.time()
@@ -131,6 +138,7 @@ def main(argv=None) -> int:
                 meta={
                     "seed": ep["seed"],
                     "wall_texture": str(cfg.env.wall_texture),
+                    "obstacle_texture": obstacle_texture(cfg),
                     "renderer": ep["renderer"],
                     "config_hash": env_hash,
                     "termination": ep["reason"],
@@ -150,6 +158,7 @@ def main(argv=None) -> int:
         "terminations": summary,
         "decisions_mean": float(np.mean(lengths)),
         "x_progress_mean_m": float(np.mean(progress)),
+        "exec_noise": OmegaConf.to_container(exec_noise) if exec_noise else None,
         "seconds": round(time.time() - t0, 1),
         "bytes": size,
         "config_hash": env_hash,
