@@ -49,7 +49,7 @@ WASHOUT_DECISIONS = 13  # flyvis starts from grey; Gate 2 drops 50 frames
 def layout(seed: int, cfg) -> np.ndarray:
     """The obstacles ``CorridorEnv.reset(seed=seed)`` draws."""
     stub = SimpleNamespace(np_random=seeding.np_random(seed)[0], n_obstacles=int(cfg.env.n_obstacles),
-                           length=float(cfg.env.corridor.length_m))
+                           length=float(cfg.env.corridor.length_m), spacing=None)
     return CorridorEnv._sample_layout(stub)
 
 

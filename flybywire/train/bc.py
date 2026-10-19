@@ -151,8 +151,13 @@ def train_bc(
     verbose: bool = True,
     conn=None,
     lptc=None,
+    init: str | None = None,
 ) -> dict:
-    """Train BC; ``conn`` / ``lptc`` override the config-built connectome / LPTC (tests, smoke)."""
+    """Train BC; ``conn`` / ``lptc`` override the config-built connectome / LPTC (tests, smoke).
+
+    ``init`` starts from a checkpoint's weights instead of a fresh network (a later curriculum stage);
+    the config must build the same network.
+    """
     from flybywire.core.model import build_model
 
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -174,6 +179,8 @@ def train_bc(
     val_idx, train_idx = order[:n_val].tolist(), order[n_val:].tolist()
 
     model = build_model(cfg, conn=conn, lptc=lptc, verbose=verbose).to(device)
+    if init is not None:
+        model.load_state_dict(torch.load(init, map_location=device)["model"])
     params = [p for n, p in model.named_parameters() if not n.startswith("critic.") and n != "actor.log_std"]
     opt = torch.optim.Adam(params, lr=float(cfg.bc.lr))
     bcfg = cfg.bc
@@ -250,6 +257,7 @@ def train_bc(
         "source": cfg.connectome.source,
         "seed": int(cfg.seed),
         "cache": str(Path(cache_dir).resolve()),
+        **({"init": str(init)} if init else {}),
         **({"pauses": {"bank": str(sampler.bank.dir.resolve()), "per_episode": sampler.per_episode, "p": sampler.p}}
            if sampler else {}),
     }
@@ -275,11 +283,12 @@ def main(argv=None) -> int:
     ap.add_argument("--updates", type=int, default=None, help="stop after N optimizer updates")
     ap.add_argument("--device", default=None)
     ap.add_argument("--wandb", action="store_true")
+    ap.add_argument("--init", default=None, help="checkpoint to start from instead of a fresh network")
     ap.add_argument("overrides", nargs="*")
     args = ap.parse_args(argv)
     cfg = load_config(args.config, args.overrides)
     cache = args.cache or str(data_dir(cfg) / "cache")
-    train_bc(cfg, cache, args.out, n_updates=args.updates, device=args.device, use_wandb=args.wandb)
+    train_bc(cfg, cache, args.out, n_updates=args.updates, device=args.device, use_wandb=args.wandb, init=args.init)
     return 0
 
 

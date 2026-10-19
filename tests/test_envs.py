@@ -255,3 +255,17 @@ def test_vec_env_same_step_autoreset(short_cfg):
         assert (info["physics_step"] == np.arange(1, 8, 2)).all()  # already the next episode's pre-roll
     finally:
         envs.close()
+
+
+def test_fixed_obstacle_spacing_keeps_neighbours_apart(tmp_path):
+    cfg = load_config(overrides=[f"paths.data_dir={tmp_path}", "env.obstacle_spacing_m=1.6", "env.n_obstacles=14"])
+    env = CorridorEnv(cfg, seed=0)
+    env.render_frame = lambda: np.zeros((env.size, env.size), np.uint8)
+    try:
+        for seed in range(20):
+            _, info = env.reset(seed=seed)
+            xs = np.sort(info["obstacles"][:, 1])
+            assert len(xs) == 14 and np.diff(xs).min() >= 1.6 * 0.7 - 1e-9
+            assert xs[0] >= 4.0 - 1.6 * 0.15
+    finally:
+        env.close()

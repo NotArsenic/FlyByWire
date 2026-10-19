@@ -34,6 +34,7 @@ from gym_pybullet_drones.envs.BaseAviary import BaseAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
 from gymnasium import spaces
 from gymnasium.utils import seeding
+from omegaconf import OmegaConf
 
 from flybywire.clocks import clocks_from_cfg
 from flybywire.config import ACTION_KEYS, data_dir, obstacle_texture
@@ -159,6 +160,8 @@ class CorridorEnv(gym.Env):
         self.width = float(e.corridor.width_m)
         self.height = float(e.corridor.height_m)
         self.n_obstacles = int(e.n_obstacles)
+        spacing = OmegaConf.select(cfg, "env.obstacle_spacing_m", default=None)
+        self.spacing = None if spacing is None else float(spacing)
         self.texture = str(e.wall_texture)
         self.obstacle_texture = obstacle_texture(cfg)
         self.n_decisions = self.clocks.n_decisions(float(e.episode_seconds))
@@ -200,7 +203,12 @@ class CorridorEnv(gym.Env):
     def _sample_layout(self) -> np.ndarray:
         rng = self.np_random
         n = self.n_obstacles
-        xs = np.linspace(FIRST_OBSTACLE_X, self.length - 2.0, n) + rng.uniform(-0.5, 0.5, n)
+        if self.spacing is None:
+            xs = np.linspace(FIRST_OBSTACLE_X, self.length - 2.0, n) + rng.uniform(-0.5, 0.5, n)
+        else:
+            # dense stage (D44): fixed spacing from the first obstacle on, jitter small enough that
+            # neighbours never overlap along x
+            xs = FIRST_OBSTACLE_X + self.spacing * (np.arange(n) + rng.uniform(-0.15, 0.15, n))
         rows = []
         for x in xs:
             y = rng.uniform(-OBSTACLE_Y_MAX, OBSTACLE_Y_MAX)
