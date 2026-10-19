@@ -1,20 +1,95 @@
 #!/usr/bin/env python
-"""Render the lesion demo video. Not implemented yet.
+"""Render the lesion demo: one held-out corridor flight with cell types silenced at fixed times.
 
-Plan: play a deterministic scripted episode (fixed seed) with a trained
-policy, toggle lesions at fixed times (e.g. EPG at 3 s, restore at 6 s; then PEN; then D7) via
-``model.lesion([...])`` / ``model.restore()``, and write a side-by-side mp4: FPV view + drone
-trajectory on the left, the 16-wedge EPG ring (layout labelled) on the right, with the active
-lesion annotated. The demo video comes from this script, not from the live dashboard.
+Each frame (one per decision, 25 fps, real time) shows a chase camera, what the eye sees, the
+corridor from above and the EPG ring on the anatomical EB layout. The heading arrows are drawn in
+the ring's frame (bump angle ~ sign * heading + offset, fitted on the intact flights of
+scripts/eval_lesions.py when its report is there), so with an intact ring the bump sits under
+the red arrow.
 
-Usage: python scripts/render_lesion_video.py --checkpoint runs/.../model.pt --out demo.mp4
+--schedule lists lesions as NAME:START-END in seconds (NAME may join groups with +); outside them
+the network is intact. The flight runs until the episode ends; --seconds sets the episode length
+(the corridor is 30 m, about 20 s of flight).
+
+Usage:
+  python scripts/render_lesion_video.py [--ckpt runs/ppo/demo/model_best.pt] [--out docs/media/lesion_demo.mp4]
+                                        [--seed 10003] [--seconds 20] [--schedule PEN:5-9 D7:11-14 EPG:16-19]
+                                        [--gif docs/media/lesion_demo.gif]
 """
 
 from __future__ import annotations
 
+import argparse
+from pathlib import Path
+
+from flybywire.config import REPO_ROOT
+
+
+def parse_schedule(items) -> list[tuple[tuple[str, ...], float, float]]:
+    out = []
+    for item in items:
+        name, span = item.split(":")
+        start, end = (float(s) for s in span.split("-"))
+        out.append((tuple(name.split("+")), start, end))
+    return out
+
+
+def active(schedule, t: float) -> tuple[str, ...]:
+    for names, start, end in schedule:
+        if start <= t < end:
+            return names
+    return ()
+
 
 def main(argv=None) -> int:
-    raise NotImplementedError("needs a trained policy; not implemented yet")
+    import imageio.v2 as imageio
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from flybywire.eval.live import Flight, draw, figure_rgb
+
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--ckpt", default=str(REPO_ROOT / "runs/sweep_dart/real_anatomical_s5/model_best.pt"))
+    ap.add_argument("--out", default=str(REPO_ROOT / "docs/media/lesion_demo.mp4"))
+    ap.add_argument("--gif", default=None, help="also write a smaller GIF (every 2nd frame, half size)")
+    ap.add_argument("--seed", type=int, default=10003)
+    ap.add_argument("--seconds", type=float, default=20.0)
+    ap.add_argument("--schedule", nargs="*", default=["PEN:5-9", "D7:11-14", "EPG:16-19"])
+    ap.add_argument("--lesion-report", default=None,
+                    help="lesions.json for the ring frame (default runs/lesions/<run>/lesions.json)")
+    args = ap.parse_args(argv)
+
+    schedule = parse_schedule(args.schedule)
+    flight = Flight(args.ckpt, args.seed, overrides=[f"env.episode_seconds={args.seconds}"])
+    report = Path(args.lesion_report or REPO_ROOT / "runs/lesions" / Path(args.ckpt).parent.name / "lesions.json")
+    if not flight.align_ring(report):
+        print(f"no {report}: heading arrows are not aligned to the ring")
+
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig = plt.figure(figsize=(12, 7.2), dpi=100)
+    frames = []
+    while not flight.done:
+        names = active(schedule, flight.time)
+        if names != flight.lesions:
+            flight.set_lesions(names)
+        flight.step()
+        draw(fig, flight)
+        frames.append(figure_rgb(fig))
+    plt.close(fig)
+    end = f"{flight.reason} at {flight.time:.1f} s"
+    flight.close()
+
+    fps = round(1 / flight.clocks.dt_control)
+    imageio.mimwrite(out, frames, fps=fps, codec="libx264", quality=7, macro_block_size=8)
+    print(f"wrote {out}: {len(frames)} frames, episode ended by {end}")
+    if args.gif:
+        small = [f[::2, ::2] for f in frames[::2]]
+        imageio.mimwrite(args.gif, small, duration=2 / fps, loop=0)
+        print(f"wrote {args.gif}")
+    return 0
 
 
 if __name__ == "__main__":
