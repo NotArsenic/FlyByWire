@@ -268,6 +268,19 @@ at random positions that always leave a gap of at least 1.1 m; 20 pillars, so a 
 8-10 of them instead of about 4. The scripted expert flies 98.0% of 200 held-out forest corridors,
 the stage-4 network 65.0%. PPO from stage 4 on this level: `runs/ppo/dense_s5_forest`.
 
+**Learnable LPTC templates (D47, D48).** In flight the network ran into pillars straight ahead.
+A probe on T4/T5 activity of expert flights showed the side to dodge to is readable from T4/T5
+(87% when the pillar is dead ahead) but less so from the 8 fixed LPTC channels (71%). Stage 4
+fine-tuned on all levels plus 400 forest episodes with the templates learnable (`lptc.mode=full`),
+against the same fine-tune with only the gains learnable:
+
+| Network | default | spaced | dense | slalom | forest |
+|---|---|---|---|---|---|
+| scripted expert | 100 | 96.5 | 99.0 | 98.0 | 98.0 |
+| 4. dense stage | 80.5 | 67.5 | 65.0 | 70.0 | 65.0 [58.2, 71.3] |
+| 5a. + forest data, gains only | 87.5 | 73.0 | 74.5 | 72.0 | 64.5 [57.7, 70.8] |
+| 5b. + forest data, learnable templates | 96.0 [92.3, 98.0] | 95.0 | 90.5 | 91.5 | 95.5 [91.7, 97.6] |
+
 **Lesions in closed loop (D41, D44).** Cell types silenced for the whole flight, 200 held-out
 default corridors; "gain" is how far the bump turns per degree the drone turns.
 

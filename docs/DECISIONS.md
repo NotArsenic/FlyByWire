@@ -826,3 +826,29 @@ expert's OU wander and DART noise are not predictable), T4/T5 linear 0.47 / 0.38
 0.13 / 0.16. The T4/T5 cache holds flyvis output before the pooling, so changing the templates
 needs no new cache; one is needed only because the curriculum caches were deleted (D45): 0.17 s
 per episode from stored hexals (800 in 137 s). runs/probe.
+
+## 2026-10-20 — D48. Learnable LPTC templates
+
+Following D47: stage 4 (runs/curriculum/dense_s5/model.pt) fine-tuned with lptc.mode=full, so the
+8 x 8 x 721 templates are trained (initialised from the flow-field templates times the stage-4
+gains; 46,144 more parameters), and as a control the same run with lptc.mode=gains. Data:
+data/cache_curriculum rebuilt (deleted in D45) from expert_dart, expert_spaced, expert_dense,
+expert_slalom and the new expert_forest, 2600 episodes, 29.7 GB, 6.6 min. Stage-4 config, lr 3e-4,
+20 epochs, both runs in parallel, 1000 s each. model.pt (last epoch) of each was fixed as the output
+before any flight. Validation heading R^2 0.959 (full) against 0.908 (gains).
+
+Closed loop, test seeds 10000-10199, success [Wilson 95] / mean x progress:
+
+| | default | spaced | dense | slalom | forest |
+|---|---|---|---|---|---|
+| expert | 100 / 8.65 | 96.5 / 10.63 | 99.0 / 6.90 | 98.0 / 6.39 | 98.0 / 6.12 |
+| stage 4 | 80.5 / 8.81 | 67.5 / 7.72 | 65.0 / 7.11 | 70.0 / 6.91 | 65.0 / 6.26 |
+| gains | 87.5 [82.2, 91.4] / 8.21 | 73.0 / 7.42 | 74.5 / 7.08 | 72.0 / 6.76 | 64.5 [57.7, 70.8] / 6.13 |
+| full | 96.0 [92.3, 98.0] / 11.17 | 95.0 / 10.36 | 90.5 / 9.01 | 91.5 / 8.03 | 95.5 [91.7, 97.6] / 6.94 |
+
+The forest data alone does nothing on forest (65.0 -> 64.5) and the gains-only run picks up 5-10
+points elsewhere; learnable templates take every level to 90-96% and fly further than the expert
+does. Success counts survival to 10 s, so the extra distance rules out a slow, cautious policy.
+Over 20 s on forest seeds 10000-10011 (the dashboard check in D47) stage 4 survives 2 of 12, the
+full run 9 of 12. One network, one seed; the lesion and ring analyses (D41, D44) are on stage 4
+and were not redone. runs/curriculum/forest_full_s5, forest_gains_s5, eval_forest_stage.json.
