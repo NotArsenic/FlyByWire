@@ -7,18 +7,26 @@ The chase camera is a copy of env 0, not env 0 itself: the window's process rebu
 corridor in its own pybullet client and puts the drone where env 0 reports it. (Opening the
 training env in a pybullet GUI tied it to that window: closing the window killed the run, D43.)
 
-``record(path)`` saves the window as a video for env 0's next full episode.
+``record(path)`` saves the window as a video for env 0's next full episode. Frames go straight to
+the encoder, so a recording costs no memory; ``room_to_record`` keeps the videos within a disk budget.
 """
 
 from __future__ import annotations
 
 import multiprocessing as mp
 import queue
+import shutil
 import time
+from pathlib import Path
 
 import numpy as np
 
 from flybywire.eval.ring import ring_activity
+
+
+def room_to_record(folder, budget_gb: float, min_free_gb: float = 10.0) -> bool:
+    used = sum(f.stat().st_size for f in Path(folder).glob("*.mp4"))
+    return used < budget_gb * 1e9 and shutil.disk_usage(folder).free > min_free_gb * 1e9
 
 
 class Watcher:
@@ -143,15 +151,14 @@ def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, lengt
     ax_map.set_yticks([])
     ax_map.set_title("corridor from above", fontsize=9)
 
+    import imageio.v2 as imageio
+
     stats, last_draw, closed = [], 0.0, False
-    armed, recording, frames = None, None, []
+    armed, recording, writer = None, None, None
 
     def finish_recording():
-        import imageio.v2 as imageio
-
-        if frames:
-            imageio.mimwrite(recording[0], frames, fps=25, codec="libx264", quality=7, macro_block_size=8)
-        frames.clear()
+        if writer is not None:
+            writer.close()
 
     while True:
         new_step = False
@@ -159,8 +166,7 @@ def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, lengt
             while True:
                 msg = q.get_nowait()
                 if msg is None:
-                    if recording is not None and frames:
-                        finish_recording()
+                    finish_recording()
                     plt.close(fig)
                     return
                 kind = msg[0]
@@ -183,11 +189,12 @@ def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, lengt
                     if mirror is not None:
                         mirror.pose(msg[1], msg[2])
                 elif kind == "episode":
-                    if recording is not None:
-                        finish_recording()
-                        recording = None
+                    finish_recording()
+                    recording, writer = armed, None
                     if armed is not None:
-                        recording, armed = armed, None
+                        writer = imageio.get_writer(armed[0], fps=25, codec="libx264", quality=7,
+                                                    macro_block_size=8)
+                        armed = None
                     trail_x.clear()
                     trail_y.clear()
                     for patch in obstacle_patches:
@@ -230,7 +237,7 @@ def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, lengt
                 title.set_text(f"PPO update {u[-1]}" + (f"   (recording: {recording[1]})" if recording else ""))
             if recording is not None:
                 fig.canvas.draw()
-                frames.append(np.asarray(fig.canvas.buffer_rgba())[..., :3].copy())
+                writer.append_data(np.asarray(fig.canvas.buffer_rgba())[..., :3])
             elif not closed:
                 fig.canvas.draw_idle()
             last_draw = now

@@ -354,7 +354,7 @@ def load_bc(path, device, overrides=()):
 
 def train_ppo(cfg, model, out_dir, n_updates: int, hours: float | None = None, device: str = "cuda",
               watch: bool = False, record_every: int | None = None, resume: bool = False,
-              bc_path: str | None = None) -> dict:
+              bc_path: str | None = None, record_budget_gb: float = 2.0) -> dict:
     from flybywire.envs.vec import make_vec_env
 
     out = Path(out_dir)
@@ -394,7 +394,7 @@ def train_ppo(cfg, model, out_dir, n_updates: int, hours: float | None = None, d
     watcher = None
     if watch or record_every:
         from flybywire.eval.ring import model_layout
-        from flybywire.train.watch import Watcher
+        from flybywire.train.watch import Watcher, room_to_record
 
         watcher = Watcher(model_layout(cfg, model, "anatomical"), model.groups[model.group_roles["heading"]], cfg)
         (out / "watch").mkdir(exist_ok=True)
@@ -435,7 +435,11 @@ def train_ppo(cfg, model, out_dir, n_updates: int, hours: float | None = None, d
             if watcher is not None:
                 watcher.update(stats)
                 if record_every and update % record_every == 0:
-                    watcher.record(out / "watch" / f"update_{update:04d}.mp4", f"update {update}")
+                    if room_to_record(out / "watch", record_budget_gb):
+                        watcher.record(out / "watch" / f"update_{update:04d}.mp4", f"update {update}")
+                    else:
+                        print(f"[ppo] upd {update:4d} recording skipped: watch/ is at its "
+                              f"{record_budget_gb} GB budget or the disk is nearly full", flush=True)
             if (update + 1) % int(p.save_every) == 0:
                 save("last.pt", update, extra=True)
                 save(f"model_u{update + 1:04d}.pt", update)
@@ -467,6 +471,8 @@ def main(argv=None) -> int:
     ap.add_argument("--hours", type=float, default=None, help="stop after this much wall time")
     ap.add_argument("--watch", action="store_true", help="live window on env 0")
     ap.add_argument("--record-every", type=int, default=None, help="record the window every N updates")
+    ap.add_argument("--record-budget-gb", type=float, default=2.0,
+                    help="stop recording once <out>/watch holds this much, or under 10 GB free")
     ap.add_argument("--resume", action="store_true", help="continue from <out>/last.pt")
     ap.add_argument("--device", default=None)
     ap.add_argument("overrides", nargs="*")
@@ -475,7 +481,7 @@ def main(argv=None) -> int:
     model, cfg = load_bc(args.bc, device, args.overrides)
     n_updates = int(args.updates or cfg.ppo.updates)
     res = train_ppo(cfg, model, args.out, n_updates, args.hours, device, args.watch, args.record_every,
-                    args.resume, args.bc)
+                    args.resume, args.bc, args.record_budget_gb)
     print(f"[ppo] done, best validation success {res['best_validation']:.3f}")
     return 0
 

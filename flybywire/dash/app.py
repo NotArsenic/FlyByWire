@@ -7,7 +7,7 @@ The video for the README comes from scripts/render_lesion_video.py, not from her
 
 Run::
 
-    streamlit run flybywire/dash/app.py -- [--ckpt runs/ppo/demo/model_best.pt]
+    streamlit run flybywire/dash/app.py -- [--ckpt runs/curriculum/dense_s5/model.pt]
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import streamlit as st  # noqa: E402
 from flybywire.config import REPO_ROOT  # noqa: E402
 from flybywire.eval.live import Flight, draw, figure_rgb  # noqa: E402
 
-DEFAULT_CKPT = REPO_ROOT / "runs/sweep_dart/real_anatomical_s5/model_best.pt"
+DEFAULT_CKPT = REPO_ROOT / "runs/curriculum/dense_s5/model.pt"
 
 
 @st.cache_resource

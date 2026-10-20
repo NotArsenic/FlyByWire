@@ -181,7 +181,8 @@ python scripts/eval_lesions.py --ckpt runs/bc/demo/model_best.pt              # 
 
 `--watch` opens one window on a training env: a chase camera, the eye's view, the corridor from
 above, the EPG ring and the training curves. `--record-every N` saves that window as a video for one
-episode every N updates (`<out>/watch/`).
+episode every N updates (`<out>/watch/`). Recording stops once that folder holds `--record-budget-gb`
+(default 2) or the disk has under 10 GB free.
 
 ## Gates
 

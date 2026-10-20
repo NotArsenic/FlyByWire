@@ -95,3 +95,12 @@ def test_warmup_trains_only_the_critic(cfg, model):
     changed = {k for k, v in model.state_dict().items() if not torch.equal(v, before[k])}
     assert "core.W" in changed and "actor.linear.weight" in changed
     assert np.isfinite(stats["pg_loss"]) and stats["kl_bc"] >= 0
+
+
+def test_recordings_stop_at_the_budget(tmp_path):
+    from flybywire.train.watch import room_to_record
+
+    assert room_to_record(tmp_path, budget_gb=1e-6, min_free_gb=0)
+    (tmp_path / "update_0000.mp4").write_bytes(b"x" * 2000)
+    assert not room_to_record(tmp_path, budget_gb=1e-6, min_free_gb=0)
+    assert not room_to_record(tmp_path, budget_gb=1.0, min_free_gb=1e9)

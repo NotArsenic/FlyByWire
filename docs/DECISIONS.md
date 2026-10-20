@@ -749,3 +749,18 @@ Unlike stage 3 (D41), PEN now matters: the bump follows turns less well without 
 drops 15.5 points. The compass still isn't frozen. docs/media/dashboard.gif shows the stage-4
 network on slalom seed 10001 with EPG silenced from 6 s; a run with PEN silenced at 4-7 s ended on
 an obstacle at 7.7 s, before its planned EPG window, and was not used. runs/lesions/dense_s5.
+
+## 2026-10-20 — D45. Caches deleted; recordings streamed and capped
+
+Deleted every T4/T5 cache and pause bank except data/cache_dart_test (the closed-loop test reads
+it): cache_curriculum, cache_dart, cache_dart_agg2, cache_uniform(_test), cache_turns_test and all
+pause_bank_* (about 97 GB). All are rebuilt from the stored hexals with scripts/build_cache.py and
+scripts/build_pause_bank.py; the trajectories, runs and checkpoints are kept.
+
+The PPO window used to hold a whole recorded episode in memory before encoding (1600x840 RGB, about
+4 MB a frame). It now streams frames to the encoder. ppo.py checks room_to_record before each
+recording and skips it once <out>/watch holds --record-budget-gb (default 2 GB) or the disk has
+under 10 GB free. A 10 s episode is 250 frames, a few MB of H.264.
+
+PPO from the stage-4 network (runs/curriculum/dense_s5/model.pt) with --watch --record-every 50,
+default 400 updates: runs/ppo/dense_s5.
