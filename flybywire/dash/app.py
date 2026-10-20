@@ -3,6 +3,8 @@
 Same views as the lesion video (flybywire/eval/live.py): chase camera, what the eye sees, the
 corridor from above and the EPG ring on the anatomical EB layout. Changing a lesion takes effect
 from the next decision (``model.lesion`` / ``model.restore``); the flight itself carries on.
+Flights last the checkpoint's own episode length (10 s, as in training and evaluation) on the
+corridor level picked in the sidebar.
 The video for the README comes from scripts/render_lesion_video.py, not from here.
 
 Run::
@@ -22,15 +24,26 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import streamlit as st  # noqa: E402
 
-from flybywire.config import REPO_ROOT  # noqa: E402
+from flybywire.config import REPO_ROOT, load_config  # noqa: E402
 from flybywire.eval.live import Flight, draw, figure_rgb  # noqa: E402
 
 DEFAULT_CKPT = REPO_ROOT / "runs/curriculum/dense_s5/model.pt"
+LEVELS = ("default", "spaced", "dense", "slalom", "forest")
+
+
+def level_overrides(level: str) -> list[str]:
+    # the checkpoint's config holds whatever corridor it was trained on, so reset the layout keys to
+    # the default corridor first and then apply the level (configs/default.yaml curriculum)
+    cfg = load_config()
+    env = cfg.env
+    spacing = "null" if env.obstacle_spacing_m is None else env.obstacle_spacing_m
+    base = [f"env.n_obstacles={env.n_obstacles}", f"env.obstacle_spacing_m={spacing}", f"env.pair_prob={env.pair_prob}"]
+    return base + ([] if level == "default" else list(cfg.curriculum[level]))
 
 
 @st.cache_resource
 def get_flight(ckpt: str) -> Flight:
-    flight = Flight(ckpt, overrides=["env.episode_seconds=20"])
+    flight = Flight(ckpt, overrides=level_overrides("default"))
     flight.align_ring(REPO_ROOT / "runs/lesions" / Path(ckpt).parent.name / "lesions.json")
     return flight
 
@@ -44,6 +57,9 @@ def main() -> None:
     flight = get_flight(args.ckpt)
     with st.sidebar:
         st.markdown(f"**checkpoint**  \n`{Path(args.ckpt).parent.name}/{Path(args.ckpt).name}`")
+        overrides = level_overrides(st.selectbox("corridor level", LEVELS))
+        if overrides != flight.overrides:
+            flight.set_overrides(overrides)
         seed = int(st.number_input("corridor seed (held-out: 10000 and up)", value=flight.seed, step=1))
         if st.button("new flight") or seed != flight.seed:
             flight.reset(seed)

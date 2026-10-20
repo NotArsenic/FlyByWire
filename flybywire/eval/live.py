@@ -25,7 +25,9 @@ class Flight:
 
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model, cfg = load_checkpoint(ckpt, self.device)
-        self.cfg = OmegaConf.merge(cfg, OmegaConf.from_dotlist(list(overrides)))
+        self.ckpt_cfg = cfg
+        self.overrides = list(overrides)
+        self.cfg = OmegaConf.merge(cfg, OmegaConf.from_dotlist(self.overrides))
         self.clocks = clocks_from_cfg(self.cfg)
         self.env = CorridorEnv(self.cfg)
         self.eye = BoxEye(int(cfg.vision.boxeye.extent), int(cfg.vision.boxeye.kernel_size), device=self.device)
@@ -56,6 +58,16 @@ class Flight:
         self.yaw = float(info["yaw"][-1])
         self.ring = np.zeros(self.layout.n_wedges)
         self.decoded = 0.0
+
+    def set_overrides(self, overrides) -> None:
+        """New corridor settings on the checkpoint's config; the network and lesions are kept."""
+        from flybywire.envs.corridor import CorridorEnv
+
+        self.env.close()
+        self.overrides = list(overrides)
+        self.cfg = OmegaConf.merge(self.ckpt_cfg, OmegaConf.from_dotlist(self.overrides))
+        self.env = CorridorEnv(self.cfg)
+        self.reset(self.seed)
 
     def align_ring(self, report) -> bool:
         """Ring frame from scripts/eval_lesions.py's intact flights, if that report exists."""

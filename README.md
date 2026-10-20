@@ -310,7 +310,8 @@ python scripts/render_lesion_video.py --ckpt runs/curriculum/dense_s5/model.pt -
 # the progress GIF: one tile per training stage on the same corridor
 python scripts/render_progress.py --out docs/media/progress.gif --seed 10001 --seconds 12 \
     env.obstacle_spacing_m=1.6 env.n_obstacles=14 --stages "stage 3=runs/sweep_dart/real_anatomical_s5/model_best.pt" ...
-# fly a policy live and toggle lesions while it flies
+# fly a policy live and toggle lesions while it flies (10 s flights, corridor level in the sidebar;
+# run inside the flybywire env: conda activate flybywire)
 streamlit run flybywire/dash/app.py -- --ckpt runs/curriculum/dense_s5/model.pt
 ```
 
