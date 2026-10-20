@@ -792,3 +792,37 @@ after. Neighbours on those levels are at least 1.1 m apart along x, so no row ev
 200 held-out forest corridors (seeds 10000..): expert 98.0%, stage-4 network 65.0%
 (runs/curriculum/eval_forest.json). PPO from stage 4 on the forest level, --watch --record-every
 50: runs/ppo/dense_s5_forest.
+The forest PPO run finished its 400 updates: validation 0.68 (BC) -> 0.60-0.73 with no trend,
+best 0.73 at update 319 on 100 seeds, inside the noise. BC stays the model of record.
+
+## 2026-10-20 — D47. The dodge side is in T4/T5 but partly lost in the 8 LPTC channels
+
+In the dashboard (20 s flights, now the checkpoint's own 10 s and a level picker) the policy flew
+straight into pillars; every crash had the pillar within 0.0-0.3 m of the drone's y. Question: is
+the side to dodge to visible to the network? scripts/probe_pillar_dodge.py on the T4/T5 activity
+of expert episodes (400 default from data/expert_dart, 400 new forest DART episodes in
+data/expert_forest, seeds 3000-3399), decisions with the nearest row 1.0-2.5 m ahead and heading
+within 30 deg: 53,183 decisions, 26% with a pillar within 0.35 m of the drone's y ("dead ahead").
+Target: sign of the expert's world-frame lateral velocity command (|vy| > 0.1 m/s; majority 50%).
+Held-out episodes (every 4th), accuracy all / dead ahead:
+
+| features | linear | MLP |
+|---|---|---|
+| geometry (privileged pillar offsets) | 79.9 / 85.0 | 88.1 / 91.2 |
+| lptc8 (the stage-4 network's channels) | 70.7 / 70.5 | 78.0 / 77.3 |
+| lptc8, lags 0-150 ms | 72.3 / 71.8 | 80.3 / 81.1 |
+| 6 self-motion + 6 loom sectors (edges +-18, +-36 deg) | 73.6 / 72.2 | 79.7 / 80.1 |
+| 6 self-motion + 8 loom sectors | 73.8 / 71.8 | 79.9 / 80.4 |
+| 8 loom sectors, lags 0-150 ms | 74.2 / 72.4 | 81.9 / 83.0 |
+| T4/T5, 8 x 721 | 84.2 / 87.4 | 85.7 / 87.3 |
+
+Forest dead ahead alone: lptc8 67.4 / 75.2, T4/T5 84.3 / 82.7. A linear readout of T4/T5 gets
+the side about as well as the pillar positions do; the fixed 8-channel pooling loses 10-17
+points of it. Azimuth-binned loom templates win back only 2-3: the information is not in
+flow-field-shaped sums. A single learned linear template on T4/T5 carries it, which is what
+lptc.mode=full (learnable templates, initialised from the current ones) allows; never tried.
+R^2 of the v_lateral / yaw-rate commands is low for every set (geometry MLP 0.52 / 0.32: the
+expert's OU wander and DART noise are not predictable), T4/T5 linear 0.47 / 0.38, lptc8 linear
+0.13 / 0.16. The T4/T5 cache holds flyvis output before the pooling, so changing the templates
+needs no new cache; one is needed only because the curriculum caches were deleted (D45): 0.17 s
+per episode from stored hexals (800 in 137 s). runs/probe.
