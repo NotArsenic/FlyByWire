@@ -763,4 +763,9 @@ recording and skips it once <out>/watch holds --record-budget-gb (default 2 GB) 
 under 10 GB free. A 10 s episode is 250 frames, a few MB of H.264.
 
 PPO from the stage-4 network (runs/curriculum/dense_s5/model.pt) with --watch --record-every 50,
-default 400 updates: runs/ppo/dense_s5.
+default 400 updates. The first launch flew the default corridor: the dense stage applied its
+corridor overrides only when the training data was collected, so the checkpoint's config still
+describes the default layout, and load_bc takes the corridor from it. Stopped at update 15
+(runs/ppo/dense_s5_default, kept with its update-0 recording). Relaunched with
+env.obstacle_spacing_m=2.0 env.n_obstacles=12, so training and the validation that picks
+model_best.pt are both on the dense level: runs/ppo/dense_s5_dense.
