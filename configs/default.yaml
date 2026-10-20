@@ -15,6 +15,7 @@ env:
   corridor: {length_m: 30, width_m: 3.0, height_m: 2.5}
   n_obstacles: 8
   obstacle_spacing_m: null # null: spread over the corridor; a number: fixed spacing from x = 4 m (D44)
+  pair_prob: 0.0           # > 0: rows at obstacle_spacing_m, each two pillars side by side with this chance (D46)
   wall_texture: none       # none | checker | noise
   obstacle_texture: none   # same choices; a config without the key has none
   renderer: tiny           # auto | egl | tiny; EGL draws shadow-map artefacts here (D29)
@@ -104,6 +105,8 @@ curriculum:                # the dense stage (D44): corridor levels, each a list
           expert.influence_m=0.5]
   slalom: [env.obstacle_spacing_m=1.6, env.n_obstacles=14, expert.speed=1.0, expert.max_heading_deg=65,
            expert.influence_m=0.5]
+  forest: [env.obstacle_spacing_m=1.6, env.n_obstacles=20, env.pair_prob=0.5, expert.speed=1.0,
+           expert.max_heading_deg=65, expert.influence_m=0.5]
 bc:
   n_trajectories: 300
   batch_episodes: 32

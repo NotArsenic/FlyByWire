@@ -769,3 +769,26 @@ describes the default layout, and load_bc takes the corridor from it. Stopped at
 (runs/ppo/dense_s5_default, kept with its update-0 recording). Relaunched with
 env.obstacle_spacing_m=2.0 env.n_obstacles=12, so training and the validation that picks
 model_best.pt are both on the dense level: runs/ppo/dense_s5_dense.
+Stopped the dense run at update 29 (validation 0.67 at the start, 0.66 at update 19): the corridor
+still looked sparse, see D46.
+
+## 2026-10-20 — D46. Forest level: rows of one or two pillars
+
+The dense levels looked sparse in flight because a 10 s episode at about 1 m/s ends near
+x = 10-12 m, so only the first 4 or so of the 12-14 obstacles are ever reached. env.pair_prob > 0
+switches the layout to rows at obstacle_spacing_m, each holding one pillar (as before, |y| <= 0.7)
+or, with that probability, two pillars side by side at y in [-1.3, 1.3], resampled until they
+don't overlap and one gap (between them or to a wall) is at least MIN_GAP = 1.1 m. n_obstacles
+counts pillars. curriculum.forest: spacing 1.6, 20 pillars, pair_prob 0.5, the dense expert
+settings. A flight now passes 8-10 pillars.
+
+The expert used to pick a side of the single nearest obstacle, which with two pillars at one x
+could steer into the other. goal() now takes every obstacle within ROW_TOL = 0.3 m (along x) of
+the nearest one ahead, including ones already passed, and aims at the widest gap of that row.
+With one obstacle per row this is the old rule exactly, tie-break included: layouts and goal()
+for 200 seeds x 50 positions on the default, dense and slalom levels are bit-identical before and
+after. Neighbours on those levels are at least 1.1 m apart along x, so no row ever has two.
+
+200 held-out forest corridors (seeds 10000..): expert 98.0%, stage-4 network 65.0%
+(runs/curriculum/eval_forest.json). PPO from stage 4 on the forest level, --watch --record-every
+50: runs/ppo/dense_s5_forest.

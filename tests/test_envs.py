@@ -9,7 +9,14 @@ from omegaconf import OmegaConf
 from flybywire.clocks import clocks_from_cfg
 from flybywire.config import data_dir, load_config
 from flybywire.data.trajectories import Trajectory, trajectory_path
-from flybywire.envs.corridor import CorridorEnv, body_to_world_velocity, denormalize_action, normalize_action, wrap
+from flybywire.envs.corridor import (
+    MIN_GAP,
+    CorridorEnv,
+    body_to_world_velocity,
+    denormalize_action,
+    normalize_action,
+    wrap,
+)
 from flybywire.envs.expert import ExecNoise, ScriptedExpert, surface_distance, turn_profile
 from flybywire.envs.vec import make_vec_env
 
@@ -269,3 +276,39 @@ def test_fixed_obstacle_spacing_keeps_neighbours_apart(tmp_path):
             assert xs[0] >= 4.0 - 1.6 * 0.15
     finally:
         env.close()
+
+
+def test_forest_rows_always_leave_a_gap(tmp_path):
+    cfg = load_config(overrides=[f"paths.data_dir={tmp_path}", "env.obstacle_spacing_m=1.6", "env.n_obstacles=20",
+                                 "env.pair_prob=0.5"])
+    env = CorridorEnv(cfg, seed=0)
+    env.render_frame = lambda: np.zeros((env.size, env.size), np.uint8)
+    pairs = 0
+    try:
+        for seed in range(50):
+            _, info = env.reset(seed=seed)
+            obs = info["obstacles"]
+            assert len(obs) == 20
+            for x in np.unique(obs[:, 1]):
+                row = obs[obs[:, 1] == x]
+                if len(row) == 1:
+                    continue
+                pairs += 1
+                (ya, ha), (yb, hb) = sorted(row[:, [2, 4]].tolist())
+                gaps = (ya - ha + 1.5, (yb - hb) - (ya + ha), 1.5 - (yb + hb))
+                assert gaps[1] > 0 and max(gaps) >= MIN_GAP
+    finally:
+        env.close()
+    assert pairs > 100
+
+
+def test_expert_aims_through_the_gap_in_a_row(cfg):
+    expert = ScriptedExpert(cfg, seed=0)
+    # two pillars side by side at x = 5 leave the corridor open only between them, at y = 0.2
+    expert.obstacles = np.array([[0, 5.0, -0.7, 0.3, 0.3], [0, 5.0, 1.1, 0.3, 0.3]])
+    dx, y = expert.goal(3.0)
+    assert dx == pytest.approx(2.0) and y == pytest.approx(0.2)
+    # still the same gap once the drone is alongside the narrower pillar
+    expert.obstacles[0, 3:] = 0.15
+    expert.obstacles[0, 2] = -0.55
+    assert expert.goal(5.2)[1] == pytest.approx(0.2)

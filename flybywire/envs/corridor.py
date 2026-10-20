@@ -46,6 +46,7 @@ FIRST_OBSTACLE_X = 4.0
 OBSTACLE_Y_MAX = 0.7          # keeps one side of every obstacle wide open
 CYLINDER_RADIUS = (0.15, 0.3)
 BOX_HALF_SIZE = (0.15, 0.35)
+MIN_GAP = 1.1                 # m; a row of two pillars always leaves one gap at least this wide
 END_MARGIN = 1.0
 WALL_SEGMENT = 2.5            # square wall panels, so textures aren't stretched
 CAMERA_OFFSET = 0.03          # m, ahead of the arms
@@ -162,6 +163,7 @@ class CorridorEnv(gym.Env):
         self.n_obstacles = int(e.n_obstacles)
         spacing = OmegaConf.select(cfg, "env.obstacle_spacing_m", default=None)
         self.spacing = None if spacing is None else float(spacing)
+        self.pair_prob = float(OmegaConf.select(cfg, "env.pair_prob", default=0.0))
         self.texture = str(e.wall_texture)
         self.obstacle_texture = obstacle_texture(cfg)
         self.n_decisions = self.clocks.n_decisions(float(e.episode_seconds))
@@ -203,22 +205,46 @@ class CorridorEnv(gym.Env):
     def _sample_layout(self) -> np.ndarray:
         rng = self.np_random
         n = self.n_obstacles
+        if self.pair_prob > 0:
+            return self._sample_rows()
         if self.spacing is None:
             xs = np.linspace(FIRST_OBSTACLE_X, self.length - 2.0, n) + rng.uniform(-0.5, 0.5, n)
         else:
             # dense stage (D44): fixed spacing from the first obstacle on, jitter small enough that
             # neighbours never overlap along x
             xs = FIRST_OBSTACLE_X + self.spacing * (np.arange(n) + rng.uniform(-0.15, 0.15, n))
-        rows = []
-        for x in xs:
-            y = rng.uniform(-OBSTACLE_Y_MAX, OBSTACLE_Y_MAX)
-            if rng.random() < 0.5:
-                r = rng.uniform(*CYLINDER_RADIUS)
-                rows.append((0, x, y, r, r))
-            else:
-                hx, hy = rng.uniform(*BOX_HALF_SIZE, 2)
-                rows.append((1, x, y, hx, hy))
+        rows = [self._pillar(x, rng.uniform(-OBSTACLE_Y_MAX, OBSTACLE_Y_MAX)) for x in xs]
         return np.array(rows, dtype=float).reshape(n, 5)
+
+    def _pillar(self, x: float, y: float) -> tuple:
+        rng = self.np_random
+        if rng.random() < 0.5:
+            r = rng.uniform(*CYLINDER_RADIUS)
+            return (0, x, y, r, r)
+        hx, hy = rng.uniform(*BOX_HALF_SIZE, 2)
+        return (1, x, y, hx, hy)
+
+    def _sample_rows(self) -> np.ndarray:
+        # forest level (D46): a row every `spacing` m holding one pillar or, with probability
+        # pair_prob, two side by side anywhere across the corridor, as long as one gap stays open
+        rng = self.np_random
+        half = self.width / 2
+        rows, k = [], 0
+        while len(rows) < self.n_obstacles:
+            x = FIRST_OBSTACLE_X + self.spacing * (k + rng.uniform(-0.15, 0.15))
+            k += 1
+            if self.n_obstacles - len(rows) < 2 or rng.random() >= self.pair_prob:
+                rows.append(self._pillar(x, rng.uniform(-OBSTACLE_Y_MAX, OBSTACLE_Y_MAX)))
+                continue
+            while True:
+                pair = sorted((self._pillar(x, rng.uniform(-half + 0.2, half - 0.2)) for _ in range(2)),
+                              key=lambda r: r[2])
+                (_, _, ya, _, ha), (_, _, yb, _, hb) = pair
+                gaps = (ya - ha + half, (yb - hb) - (ya + ha), half - (yb + hb))
+                if gaps[1] > 0 and max(gaps) >= MIN_GAP:
+                    break
+            rows += pair
+        return np.array(rows, dtype=float)
 
     def _body(self, cid, col, vis, center, texture):
         body = p.createMultiBody(0, col, vis, basePosition=center, physicsClientId=cid)

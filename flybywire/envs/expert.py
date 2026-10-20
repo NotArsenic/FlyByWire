@@ -1,7 +1,7 @@
 """Scripted expert that generates the BC data. It reads the privileged state in info.
 
 A potential field in the corridor plane pulls toward a point straight down the corridor, or toward
-the wider gap beside the next obstacle when that obstacle blocks the centre line, and pushes away
+the widest gap in the next row of obstacles when that row blocks the centre line, and pushes away
 from obstacle and wall surfaces closer than influence_m. The field direction plus a slow random
 wander (seeded OU process, so dodges differ between episodes) is the desired heading, and a
 heading PID turns toward it. Velocity is `speed` along that heading, altitude is held.
@@ -25,6 +25,8 @@ from omegaconf import OmegaConf
 
 from flybywire.clocks import clocks_from_cfg
 from flybywire.envs.corridor import normalize_action, wrap
+
+ROW_TOL = 0.3  # m along x; obstacles closer than this belong to one row (other levels keep >= 1.1 m)
 
 
 def surface_distance(px: float, py: float, obstacle) -> tuple[float, np.ndarray]:
@@ -112,13 +114,17 @@ class ScriptedExpert:
         ahead = [ob for ob in self.obstacles if -ob[3] < ob[1] - x < self.lookahead]
         if not ahead:
             return self.lookahead, 0.0
-        _, ox, oy, _, hy = min(ahead, key=lambda ob: ob[1])
-        lo, hi = oy - hy - self.clearance, oy + hy + self.clearance
-        if not lo < 0.0 < hi:
+        ox = min(ob[1] for ob in ahead)
+        # every pillar of the nearest row, passed or not, so the chosen gap holds until the row is
+        # behind; rows of two exist only on the forest level (D46), elsewhere a row is one obstacle
+        row = sorted((ob[2] - ob[4] - self.clearance, ob[2] + ob[4] + self.clearance)
+                     for ob in self.obstacles if abs(ob[1] - ox) < ROW_TOL)
+        if not any(lo < 0.0 < hi for lo, hi in row):
             return self.lookahead, 0.0
         wall = self.half_width - self.wall_margin
-        left, right = (hi, wall), (-wall, lo)
-        gap = left if left[1] - left[0] >= right[1] - right[0] else right
+        edges = [-wall, *(e for span in row for e in span), wall]
+        gaps = list(zip(edges[::2], edges[1::2], strict=True))
+        gap = max(reversed(gaps), key=lambda g: g[1] - g[0])  # ties go to +y, as before
         return max(ox - x, 0.5), 0.5 * (gap[0] + gap[1])
 
     def field(self, x: float, y: float) -> tuple[np.ndarray, float]:

@@ -263,6 +263,11 @@ corridors per level [Wilson 95%]:
 | 3. BC, DART + DAgger | 79.5 [73.4, 84.5] | 65.5 | 58.0 | 54.5 [47.6, 61.3] |
 | 4. + dense corridors | 80.5 [74.5, 85.4] | 67.5 | 65.0 | 70.0 [63.3, 75.9] |
 
+A "forest" level (D46) puts a row every 1.6 m with one pillar or, half the time, two side by side
+at random positions that always leave a gap of at least 1.1 m; 20 pillars, so a 10 s flight passes
+8-10 of them instead of about 4. The scripted expert flies 98.0% of 200 held-out forest corridors,
+the stage-4 network 65.0%. PPO from stage 4 on this level: `runs/ppo/dense_s5_forest`.
+
 **Lesions in closed loop (D41, D44).** Cell types silenced for the whole flight, 200 held-out
 default corridors; "gain" is how far the bump turns per degree the drone turns.
 
