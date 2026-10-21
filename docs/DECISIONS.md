@@ -852,3 +852,19 @@ does. Success counts survival to 10 s, so the extra distance rules out a slow, c
 Over 20 s on forest seeds 10000-10011 (the dashboard check in D47) stage 4 survives 2 of 12, the
 full run 9 of 12. One network, one seed; the lesion and ring analyses (D41, D44) are on stage 4
 and were not redone. runs/curriculum/forest_full_s5, forest_gains_s5, eval_forest_stage.json.
+
+## 2026-10-21 — D49. 3D FlyWire brain animation, TikZ architecture diagram, and README update
+
+`scripts/render_brain_3d.py` renders `docs/media/fly_brain_3d.gif` (and `.mp4`) directly from
+`data/flywire/skeletons/sk_lod1_783_healed_ds2.parquet`, `data/flywire/raw/consolidated_cell_types.csv`,
+and `data/flywire/processed/cx_graph.npz`. Left panel: whole adult brain point cloud (139,273
+neurons) highlighting the 65 `flyvis` optic-lobe cell types (57 upstream retinotopic types in cyan,
+8 T4a-d / T5a-d motion readout types in gold) and the central complex at the midline. Right panel:
+4x midline zoom of all 457 central-complex skeletons (17,041 edges) colored by cell class (ER, EPG,
+PEN, PEG, Delta7, PFL3) with 3D anatomical landmarks (PB, EB, BU, LAL).
+
+`docs/media/architecture.tex` compiles the multi-rate control and neural architecture diagram via
+TikZ/PGF to `docs/media/architecture.pdf` and `docs/media/architecture.png`. Updated `README.md`
+with the 3D brain GIF, the forest dashboard GIF (`docs/media/dashboard_forest.gif`), the TikZ
+architecture diagram, full mathematical equations, verification gates, ablation and curriculum
+tables, reproduction commands, and references.
