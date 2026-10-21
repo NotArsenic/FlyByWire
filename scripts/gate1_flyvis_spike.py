@@ -83,13 +83,13 @@ def main(argv=None) -> int:
     assert not stepper.net.training, "flyvis must be in eval mode"
 
     frames = drifting_frames(200, size, fov, clocks.sensory_hz)
-    hexals = eye(torch.from_numpy(frames).cuda())[None]  # (1, 200, 721)
-    ref = stepper.full_sequence_reference(hexals)  # (a)
+    hexals = eye(torch.from_numpy(frames).cuda())[None]
+    ref = stepper.full_sequence_reference(hexals)
     scale = float(ref.abs().max())
     equivalence = {}
     for mode in ("fast", "public"):
         stepper.mode = mode
-        out = stepper.run_sequence(hexals)  # (b)
+        out = stepper.run_sequence(hexals)
         max_abs = float((out - ref).abs().max())
         equivalence[mode] = {"max_abs_diff": max_abs, "rel_diff": max_abs / scale, "pass": max_abs / scale <= REL_TOL}
     stepper.mode = "fast"

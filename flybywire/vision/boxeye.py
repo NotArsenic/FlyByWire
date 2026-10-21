@@ -41,7 +41,7 @@ class BoxEye:
             raise ValueError(f"expected (B, H, W) frames, got {tuple(x.shape)}")
         x = x.float() / 255.0 if x.dtype == torch.uint8 else x.float()
         with torch.device(self.device):
-            out = self._eye(x[:, None], ftype="mean", hex_sample=True)  # (B, 1, 1, hexals)
+            out = self._eye(x[:, None], ftype="mean", hex_sample=True)
         return out.reshape(x.shape[0], self.n_hexals).float()
 
     def receptor_centers(self) -> np.ndarray:

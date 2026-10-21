@@ -67,12 +67,12 @@ class FlyvisStepper:
         self.n_nodes = int(net.n_nodes)
 
         c = net.connectome
-        self._input_index = torch.as_tensor(net.stimulus.input_index, device=self.device)  # (8, 721)
+        self._input_index = torch.as_tensor(net.stimulus.input_index, device=self.device)
         self.n_hexals = int(self._input_index.shape[1])
         idx = [torch.as_tensor(c.nodes.layer_index[t][:], device=self.device) for t in self.cell_types]
         if any(len(i) != self.n_hexals for i in idx):
             raise RuntimeError("T4/T5 cell counts differ from the number of input hexals")
-        self._out_index = torch.stack(idx)  # (8, 721)
+        self._out_index = torch.stack(idx)
 
         with torch.no_grad(), torch.device(self.device):
             net.clamp()
@@ -80,8 +80,8 @@ class FlyvisStepper:
             ss = net.steady_state(self.steady_state_seconds, self.dt, batch_size=1, value=self.grey_value)
             if len(ss.edges):
                 raise RuntimeError("flyvis dynamics carry edge state; stepper assumes node-only state")
-            self._steady = ss.nodes.activity[0].detach().clone()  # (n_nodes,)
-        self.state: torch.Tensor | None = None  # (B, n_nodes)
+            self._steady = ss.nodes.activity[0].detach().clone()
+        self.state: torch.Tensor | None = None
         from flyvis.utils.tensor_utils import AutoDeref
 
         self._AutoDeref = AutoDeref
@@ -141,7 +141,7 @@ class FlyvisStepper:
 
     @torch.no_grad()
     def full_sequence_reference(self, hexals: torch.Tensor) -> torch.Tensor:
-        """One ``Network.forward`` call over the whole sequence from the grey steady state (Gate 1 (a))."""
+        """One ``Network.forward`` call over the whole sequence from the grey steady state."""
         hexals = torch.as_tensor(hexals, device=self.device).float()
         b, t, _ = hexals.shape
         AutoDeref = self._AutoDeref
@@ -149,7 +149,7 @@ class FlyvisStepper:
             x = torch.zeros(b, t, self.n_nodes, device=self.device)
             x[:, :, self._input_index] = hexals[:, :, None, :]
             st = self.net._state_api(AutoDeref(nodes=AutoDeref(activity=self.steady_state(b)), edges=AutoDeref()))
-            act = self.net.forward(x, self.dt, state=st, as_states=False)  # (B, T, n_nodes)
+            act = self.net.forward(x, self.dt, state=st, as_states=False)
         return act[:, :, self._out_index]
 
     def requires_grad_any(self) -> bool:

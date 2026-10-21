@@ -30,17 +30,16 @@ STATE_KEYS = ("pos", "quat", "vel", "ang_vel", "yaw")
 
 
 def wrap_angle(a):
-    """Wrap to [-pi, pi)."""
     return (np.asarray(a) + np.pi) % (2 * np.pi) - np.pi
 
 
 def relative_yaw(yaw, yaw_0):
-    """Heading relative to episode start: ``wrap(yaw_t - yaw_0)`` (invariant 9)."""
+    """Heading relative to episode start: wrap(yaw_t - yaw_0)."""
     return wrap_angle(np.asarray(yaw) - yaw_0)
 
 
 def heading_target(rel_yaw):
-    """``(sin, cos)`` of relative yaw, shape (..., 2) (invariant 9)."""
+    """(sin, cos) of relative yaw, shape (..., 2)."""
     rel_yaw = np.asarray(rel_yaw)
     return np.stack([np.sin(rel_yaw), np.cos(rel_yaw)], axis=-1)
 

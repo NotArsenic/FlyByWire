@@ -36,11 +36,11 @@ class FarnebackBackend:
         self.downsample = downsample
         self.scale = np.tan(np.deg2rad(fov_deg) / 2.0) / (self.size / 2.0) * sensory_hz
         xy = pixel_grid_focal(self.size, fov_deg)
-        t = flow_templates(xy, tuple(channels), tilt_deg)  # (K, P, 2)
+        t = flow_templates(xy, tuple(channels), tilt_deg)
         t = t.reshape(t.shape[0], -1)
         norms = np.linalg.norm(t, axis=1, keepdims=True)
         norms[norms == 0] = 1.0
-        self.templates = (t / norms).astype(np.float32)  # (K, P*2)
+        self.templates = (t / norms).astype(np.float32)
         self.prev: list[np.ndarray | None] = []
 
     def reset(self, batch_size: int | None = None, env_ids: Sequence[int] | None = None) -> None:

@@ -43,16 +43,16 @@ log = logging.getLogger(__name__)
 
 START_X = 1.0
 FIRST_OBSTACLE_X = 4.0
-OBSTACLE_Y_MAX = 0.7          # keeps one side of every obstacle wide open
+OBSTACLE_Y_MAX = 0.7
 CYLINDER_RADIUS = (0.15, 0.3)
 BOX_HALF_SIZE = (0.15, 0.35)
-MIN_GAP = 1.1                 # m; a row of two pillars always leaves one gap at least this wide
+MIN_GAP = 1.1
 END_MARGIN = 1.0
-WALL_SEGMENT = 2.5            # square wall panels, so textures aren't stretched
-CAMERA_OFFSET = 0.03          # m, ahead of the arms
+WALL_SEGMENT = 2.5
+CAMERA_OFFSET = 0.03
 NEAR, FAR = 0.05, 40.0
 GRAY = np.array([0.299, 0.587, 0.114])
-TEXTURED_OBSTACLE_GRAY = 0.6   # darker than the walls, so the silhouette keeps its contrast
+TEXTURED_OBSTACLE_GRAY = 0.6
 
 
 def action_bounds(limits) -> tuple[np.ndarray, np.ndarray]:
@@ -106,7 +106,6 @@ def _texture_file(kind: str, directory: Path, size: int = 256) -> str:
 
 
 class _Aviary(BaseAviary):
-    # one physics step per step(); the corridor is added as its obstacles
     def __init__(self, env: CorridorEnv, physics_hz: int, gui: bool):
         self._env = env
         super().__init__(
@@ -314,7 +313,7 @@ class CorridorEnv(gym.Env):
             cur_quat=quat,
             cur_vel=vel,
             cur_ang_vel=av.ang_v[0],
-            target_pos=pos,  # velocity tracking only, like VelocityAviary
+            target_pos=pos,
             target_rpy=np.array([0.0, 0.0, self._target_yaw]),
             target_vel=body_to_world_velocity(cmd[:3], rpy[2]),
             target_rpy_rates=np.array([0.0, 0.0, cmd[3]]),

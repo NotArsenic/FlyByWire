@@ -148,12 +148,12 @@ class Episode:
     reason: str  # collision, out_of_bounds, end or time
     x_progress: float
     collided: bool
-    action: np.ndarray  # (K, 4) flown
-    label: np.ndarray  # (K, 4) scripted expert on the visited states
-    heading_err_deg: np.ndarray | None = None  # (T,)
+    action: np.ndarray
+    label: np.ndarray
+    heading_err_deg: np.ndarray | None = None
     file: str | None = None
-    state: dict | None = None  # STATE_FIELDS per frame, (T, ...)
-    obstacles: np.ndarray | None = None  # (n, 5) as in the env's reset info
+    state: dict | None = None
+    obstacles: np.ndarray | None = None
 
     @property
     def n_decisions(self) -> int:
@@ -168,7 +168,7 @@ class Episode:
 class Rollout:
     index: int
     seed: int
-    infos: list = field(default_factory=list)  # one per window: what decision k saw
+    infos: list = field(default_factory=list)
     outs: list = field(default_factory=list)
 
 

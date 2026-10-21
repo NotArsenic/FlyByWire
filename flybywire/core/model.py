@@ -83,23 +83,16 @@ class FlyByWireModel(nn.Module):
         return self.core.init_state(batch_size)
 
     def sensory(self, x: torch.Tensor) -> torch.Tensor:
-        """(..., 8, 721) T4/T5 -> (..., 8) channels; identity for the Farneback backend."""
         return self.lptc(x) if self.lptc is not None else x.float()
 
     def core_step(self, v: torch.Tensor, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """One sensory tick: x = T4/T5 (B, 8, 721) or channels (B, 8). Returns (v_next, r_next)."""
         u = self.inproj(self.sensory(x))
         return self.core(v, u)
 
     def run(self, x_seq: torch.Tensor, v0: torch.Tensor, t0: int = 0) -> dict[str, torch.Tensor]:
-        """Run the core over a window of T sensory ticks starting at global core step ``t0``.
-
-        x_seq: (B, T, 8, 721) or (B, T, 8). Returns ``v`` (final state), ``r`` (B, T, N),
-        ``heading`` (B, T, 2), ``action_mean`` (B, K, 4) at decision steps, ``decision_t`` (K,)
-        local indices of those steps, and ``s`` (B, T, 8) sensory channels.
-        """
+        """Run the core over a window of T sensory ticks starting at global core step t0."""
         b, t = x_seq.shape[:2]
-        s = self.sensory(x_seq)  # LPTC over the whole window at once (no recurrence there)
+        s = self.sensory(x_seq)
         u = self.inproj(s)
         v = v0
         rs = []

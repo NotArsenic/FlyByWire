@@ -90,13 +90,13 @@ def measure_directions(
     R = np.zeros((n_directions, len(cell_types)))
     for period, tf in conditions:
         frames = np.stack([grating_sequence(frame_size, period, tf, n_frames, frame_hz, float(a)) for a in angles])
-        x = torch.from_numpy(frames).to(eye.device)  # (D, T, H, W)
-        hexals = torch.stack([eye(x[:, t]) for t in range(n_frames)], dim=1)  # (D, T, 721)
-        out = stepper.run_sequence(hexals)  # (D, T, 8, 721)
+        x = torch.from_numpy(frames).to(eye.device)
+        hexals = torch.stack([eye(x[:, t]) for t in range(n_frames)], dim=1)
+        out = stepper.run_sequence(hexals)
         R += torch.relu(out[:, n_skip:][..., central]).mean(dim=(1, 3)).cpu().numpy() / len(conditions)
     stepper.reset(1)
     grey = torch.relu(stepper.state[:, stepper._out_index][..., central]).mean(dim=(0, 2)).cpu().numpy()
-    vec = (R * np.exp(1j * angles)[:, None]).sum(axis=0)  # (8,) complex
+    vec = (R * np.exp(1j * angles)[:, None]).sum(axis=0)
     cardinal = {"+x": 0.0, "+y": 90.0, "-x": 180.0, "-y": 270.0}
     deg = np.round(np.degrees(angles), 6)
     subtypes = {}

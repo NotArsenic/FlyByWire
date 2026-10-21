@@ -93,7 +93,7 @@ def main(argv=None) -> int:
     x_real = torch.from_numpy(np.asarray(data.data[rows]).astype(np.float32))
     yaw_rate = np.concatenate([Trajectory.load(p, load_hexals=False).yaw_rate[105::10] for p in data.trajectories])
 
-    w1 = next(iter(models.values()))[0].lptc.w.numpy().astype(np.float64)  # templates, unit norm over (type, hexal)
+    w1 = next(iter(models.values()))[0].lptc.w.numpy().astype(np.float64)
     report = {
         "baseline_in_direction_map": dict(zip(types, b.round(5).tolist(), strict=True)),
         "baseline_measured_on": dm["stimulus"]["response"]

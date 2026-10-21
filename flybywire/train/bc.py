@@ -40,8 +40,8 @@ from flybywire.eval.metrics import angular_error_deg, heading_r2
 
 @dataclass
 class EpisodeTargets:
-    actions: np.ndarray  # (K, 4)
-    heading: np.ndarray  # (T, 2)
+    actions: np.ndarray
+    heading: np.ndarray
 
 
 class BCData:

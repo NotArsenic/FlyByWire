@@ -39,9 +39,9 @@ ENTRY_KEYS = ("episode", "t0", "hold", "rec", "row")
 
 
 def draw_entries(lengths, clocks: Clocks, per_episode, hold_steps, recovery, rng) -> dict[str, np.ndarray]:
-    """Pause starts uniform over each episode's decision boundaries, at least ``2 * recovery`` steps apart."""
+    """Pause starts uniform over each episode's decision boundaries, at least 2 * recovery steps apart."""
     spd = clocks.sensory_per_decision
-    gap = -(-2 * recovery // spd)  # decisions
+    gap = -(-2 * recovery // spd)
     lo, hi = hold_steps
     if lo % spd or hi % spd:
         raise ValueError(f"hold_steps {hold_steps} must be multiples of {spd}")
@@ -119,7 +119,7 @@ def build_bank(
                 h, t0, m, r = hexals[ent["episode"][e] - idx[0]], ent["t0"][e], ent["hold"][e], ent["rec"][e]
                 seq[j, :m] = h[t0]
                 seq[j, m : m + r] = h[t0 + 1 : t0 + 1 + r]
-                seq[j, m + r :] = h[t0]  # padding, never stored
+                seq[j, m + r :] = h[t0]
             stepper.state = torch.stack([snap[e] for e in chunk])
             seq = torch.from_numpy(seq).to(stepper.device)
             out = np.stack([stepper.step(seq[:, s]).to(torch.float16).cpu().numpy() for s in range(length)], 1)
@@ -172,11 +172,9 @@ class PauseBank:
         return len(self.t0)
 
     def entries(self, episode: int) -> np.ndarray:
-        """Entry ids of one episode, in order of t0."""
         return self._by_episode.get(int(episode), np.empty(0, dtype=np.int64))
 
     def segments(self, e: int) -> tuple[np.ndarray, np.ndarray]:
-        """(hold, rec) T4/T5 rows of entry e, each (n, 8, 721) float16."""
         r, m = int(self.row[e]), int(self.hold[e])
         return self.data[r : r + m], self.data[r + m : r + m + int(self.rec[e])]
 

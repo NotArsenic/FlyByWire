@@ -15,11 +15,11 @@ import numpy as np
 
 @dataclass
 class Connectome:
-    M: np.ndarray  # (N, N) bool, M[pre, post]
-    neuron_ids: np.ndarray  # (N,) int64
-    types: np.ndarray  # (N,) str, cell-type label
-    instances: np.ndarray  # (N,) str, instance / name
-    groups: dict[str, np.ndarray]  # group name -> sorted int64 indices
+    M: np.ndarray
+    neuron_ids: np.ndarray
+    types: np.ndarray
+    instances: np.ndarray
+    groups: dict[str, np.ndarray]
     source: str = "unknown"
     meta: dict = field(default_factory=dict)
 
@@ -53,7 +53,6 @@ class Connectome:
         return self.M.sum(axis=1)
 
     def with_mask(self, M: np.ndarray, **meta) -> Connectome:
-        """Same neurons and groups, different edges."""
         return replace(self, M=np.asarray(M, dtype=bool), groups=dict(self.groups), meta={**self.meta, **meta})
 
     def summary_table(self) -> str:

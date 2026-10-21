@@ -18,14 +18,12 @@ import argparse
 import sys
 from pathlib import Path
 
-import matplotlib
+import streamlit as st
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import streamlit as st  # noqa: E402
-
-from flybywire.config import REPO_ROOT, load_config  # noqa: E402
-from flybywire.eval.live import Flight, draw, figure_rgb  # noqa: E402
+from flybywire.config import REPO_ROOT, load_config
+from flybywire.eval.live import Flight, draw, figure_rgb
 
 DEFAULT_CKPT = REPO_ROOT / "runs/curriculum/dense_s5/model.pt"
 LEVELS = ("default", "spaced", "dense", "slalom", "forest")
@@ -71,7 +69,9 @@ def main() -> None:
 
     view = st.empty()
     status = st.empty()
-    fig = plt.figure(figsize=(12, 7.2), dpi=90)
+    # not pyplot: streamlit runs each rerun on its own thread and pyplot's global state is not shared safely
+    fig = Figure(figsize=(12, 7.2), dpi=90)
+    FigureCanvasAgg(fig)
     draw(fig, flight)
     view.image(figure_rgb(fig))
     while flying and not flight.done:
@@ -80,7 +80,6 @@ def main() -> None:
         view.image(figure_rgb(fig))
     if flight.done:
         status.info(f"episode ended: {flight.reason} at {flight.time:.1f} s. Press 'new flight' or change the seed.")
-    plt.close(fig)
 
 
 main()

@@ -31,7 +31,7 @@ class InputProjection(nn.Module):
         self.bias = nn.Parameter(torch.zeros(k))
 
     def forward(self, s: torch.Tensor) -> torch.Tensor:
-        u_target = s @ self.weight + self.bias  # (B, |ER|)
+        u_target = s @ self.weight + self.bias
         u = s.new_zeros(*s.shape[:-1], self.n_neurons)
         return u.index_copy(-1, self.target_index, u_target)
 
@@ -63,7 +63,7 @@ class AnatomicalHeadingDecoder(nn.Module):
         self.register_buffer("source_index", _idx(source_index))
         angle = torch.as_tensor(np.asarray(angle), dtype=torch.float32)
         keep = torch.as_tensor(np.asarray(reliable), dtype=torch.float32)
-        self.register_buffer("unit", torch.stack([angle.sin(), angle.cos()]) * keep)  # (2, |EPG|)
+        self.register_buffer("unit", torch.stack([angle.sin(), angle.cos()]) * keep)
         self.gain = nn.Parameter(torch.tensor(float(gain_init)))
         self.bias = nn.Parameter(torch.zeros(2))
 
@@ -83,7 +83,6 @@ class Actor(nn.Module):
         self.log_std = nn.Parameter(torch.full((n_actions,), float(log_std_init)))
 
     def forward(self, r: torch.Tensor) -> torch.Tensor:
-        """Action mean in [-1, 1]."""
         return torch.tanh(self.linear(r.index_select(-1, self.source_index)))
 
     def distribution(self, r: torch.Tensor) -> torch.distributions.Normal:

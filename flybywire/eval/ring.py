@@ -26,8 +26,8 @@ LAYOUTS = ("anatomical", "tuning", "auto")
 
 @dataclass
 class RingLayout:
-    wedge_of_neuron: np.ndarray  # (n_epg,) int wedge index, -1 = no wedge
-    mode: str  # the mode actually used
+    wedge_of_neuron: np.ndarray
+    mode: str
     n_wedges: int = 16
 
     @property
@@ -45,13 +45,12 @@ def anatomical_wedges(angle, reliable, n_wedges: int = 16) -> np.ndarray:
 
 
 def tuning_wedges(decoder_weight, n_wedges: int = 16) -> np.ndarray:
-    """decoder_weight: (2, n_epg) rows (sin, cos) -> wedge index per EPG neuron (-1 for zero weights)."""
+    """Wedge index per EPG neuron from heading decoder weights (-1 for zero weights)."""
     w = np.asarray(decoder_weight.detach().cpu() if hasattr(decoder_weight, "detach") else decoder_weight)
     return np.where(np.hypot(w[0], w[1]) > 0, _wedge(np.arctan2(w[0], w[1]), n_wedges), -1)
 
 
 def make_layout(mode: str, eb_angles=None, decoder_weight=None, n_wedges: int = 16) -> RingLayout:
-    """eb_angles: (angle_rad, reliable) per EPG neuron, or None when the angles file is missing."""
     if mode not in LAYOUTS:
         raise ValueError(f"ring layout must be one of {LAYOUTS}")
     if mode == "anatomical" or (mode == "auto" and eb_angles is not None):
@@ -71,7 +70,7 @@ def model_layout(cfg, model, mode: str | None = None) -> RingLayout:
 
 
 def ring_activity(r_epg, layout: RingLayout) -> np.ndarray:
-    """r_epg: (..., n_epg) rates -> (..., n_wedges) mean rate per wedge (NaN for empty wedges)."""
+    """Mean rate per wedge from EPG rates (NaN for empty wedges)."""
     r = np.asarray(r_epg.detach().cpu() if hasattr(r_epg, "detach") else r_epg, dtype=np.float64)
     out = np.full((*r.shape[:-1], layout.n_wedges), np.nan)
     for w in range(layout.n_wedges):

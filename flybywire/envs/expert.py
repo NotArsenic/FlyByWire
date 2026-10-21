@@ -37,7 +37,7 @@ def surface_distance(px: float, py: float, obstacle) -> tuple[float, np.ndarray]
         r = np.hypot(dx, dy)
         return r - hx, np.array([dx, dy]) / max(r, 1e-9)
     qx, qy = abs(dx) - hx, abs(dy) - hy
-    if qx <= 0 and qy <= 0:  # inside: push out through the nearer face
+    if qx <= 0 and qy <= 0:
         return max(qx, qy), (np.array([np.sign(dx), 0.0]) if qx > qy else np.array([0.0, np.sign(dy)]))
     v = np.array([max(qx, 0.0) * np.sign(dx), max(qy, 0.0) * np.sign(dy)])
     d = np.linalg.norm(v)
@@ -105,7 +105,7 @@ class ScriptedExpert:
         self.wander = 0.0
         if self.turns is not None:
             self.t = 0.0
-            self.yaw_u = float(info["rel_yaw"][-1])  # unwrapped rel_yaw
+            self.yaw_u = float(info["rel_yaw"][-1])
             self.legs = []
             self.next_turn = self.turn_rng.uniform(*self.turns.wait_s)
 
@@ -124,7 +124,7 @@ class ScriptedExpert:
         wall = self.half_width - self.wall_margin
         edges = [-wall, *(e for span in row for e in span), wall]
         gaps = list(zip(edges[::2], edges[1::2], strict=True))
-        gap = max(reversed(gaps), key=lambda g: g[1] - g[0])  # ties go to +y, as before
+        gap = max(reversed(gaps), key=lambda g: g[1] - g[0])
         return max(ox - x, 0.5), 0.5 * (gap[0] + gap[1])
 
     def field(self, x: float, y: float) -> tuple[np.ndarray, float]:
@@ -156,7 +156,7 @@ class ScriptedExpert:
             far = home + rng.uniform(-180.0, 180.0)
         else:
             far = float(rng.choice(np.asarray(self.turns.angles_deg))) * rng.choice([-1, 1])
-            home = 360.0 * np.round(far / 360.0)  # nearest multiple of 360, so the short way back to heading 0
+            home = 360.0 * np.round(far / 360.0)
         out = [(far, rng.uniform(*self.turns.hold_s))] if far != home else []
         self.legs = [(np.deg2rad(angle), hold) for angle, hold in (*out, (home, 0.0))]
         self.leg_from, self.leg_t = self.yaw_u, 0.0

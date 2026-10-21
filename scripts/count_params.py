@@ -40,7 +40,7 @@ def main(argv=None) -> int:
     cfg = load_config(overrides=argv if argv is not None else sys.argv[1:])
     conn = build_connectome(cfg)
     k, d, p = len(cfg.lptc.channels), len(cfg.vision.cell_types), 721
-    dummy = np.zeros((k, d, p), dtype=np.float32)  # counts do not depend on template values
+    dummy = np.zeros((k, d, p), dtype=np.float32)
     model = build_model(cfg, conn=conn, lptc=LPTCPool(dummy, mode=cfg.lptc.mode), verbose=False)
     rows = count(model)
     w = max(len(r) for r in rows)

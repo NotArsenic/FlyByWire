@@ -1,5 +1,4 @@
-"""Config loading. ``load_config()`` reads configs/default.yaml, applies dotlist overrides
-(``["core.phi=relu"]``), resolves interpolations and validates; problems raise :class:`ConfigError`."""
+"""Configuration loading and validation."""
 
 from __future__ import annotations
 
@@ -127,7 +126,6 @@ def validate_config(cfg: DictConfig) -> Clocks:
 
 
 def obstacle_texture(cfg: DictConfig) -> str:
-    """env.obstacle_texture; configs from before the key existed have flat grey obstacles."""
     return str(OmegaConf.select(cfg, "env.obstacle_texture", default="none"))
 
 

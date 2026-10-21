@@ -194,7 +194,7 @@ def check_flyvis() -> None:
 def _time_render(p, renderer: int, n: int = 30) -> float:
     view = p.computeViewMatrix([0, 0, 1], [1, 0, 1], [0, 0, 1])
     proj = p.computeProjectionMatrixFOV(110, 1.0, 0.05, 50)
-    p.getCameraImage(160, 160, view, proj, renderer=renderer)  # warmup
+    p.getCameraImage(160, 160, view, proj, renderer=renderer)
     t0 = time.perf_counter()
     for _ in range(n):
         p.getCameraImage(160, 160, view, proj, renderer=renderer)

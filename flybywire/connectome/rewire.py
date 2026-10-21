@@ -22,7 +22,7 @@ class RewireStats:
     swaps_target: int
     swaps_done: int
     attempts: int
-    surviving_fraction: float  # fraction of original edges still present
+    surviving_fraction: float
 
 
 def directed_rewire(

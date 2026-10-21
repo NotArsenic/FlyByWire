@@ -1,4 +1,4 @@
-"""PPO fine-tuning from a BC checkpoint. Written by hand, no RLlib or SB3.
+"""PPO fine-tuning from a BC checkpoint.
 
 Rollouts
     Synchronous, on-policy. ``ppo.n_envs`` envs in ``AsyncVectorEnv(shared_memory=True,

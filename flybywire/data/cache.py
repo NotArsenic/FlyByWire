@@ -116,7 +116,6 @@ class T4T5Cache:
         return int(self.offsets[i + 1] - self.offsets[i])
 
     def episode(self, i: int) -> np.ndarray:
-        """(T_i, 8, 721) float16 memmap view."""
         return self.data[self.offsets[i] : self.offsets[i + 1]]
 
     @property

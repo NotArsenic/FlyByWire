@@ -27,7 +27,6 @@ class SchemaError(SystemExit):
 
 
 def _read_table(path: Path, needed: dict[str, str], what: str) -> pd.DataFrame:
-    """Read a CSV / CSV.GZ / parquet / feather table and check the needed columns exist."""
     if not path.exists():
         raise FileNotFoundError(
             f"{what} table not found: {path}\n"

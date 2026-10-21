@@ -341,7 +341,7 @@ def main(argv=None) -> int:
     data = BCData(T4T5Cache(args.cache), clocks_from_cfg(cfg))
     grey = grey_t4t5(cfg, device).cpu()
     last = [int(round(t * 100)) - 1 for t in args.t0]
-    hexals = np.stack([Trajectory.load(p).hexals[last] for p in data.cache.trajectories], axis=1)  # (n_t0, n_ep, 721)
+    hexals = np.stack([Trajectory.load(p).hexals[last] for p in data.cache.trajectories], axis=1)
     frames = static_t4t5(cfg, device, hexals.reshape(-1, 721), args.hold_seconds, args.flyvis_chunk)
     frames = frames.astype(np.float16).astype(np.float32)
     gc.collect()

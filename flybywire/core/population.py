@@ -86,7 +86,6 @@ class CentralComplex(nn.Module):
         return torch.zeros(batch_size, self.n, device=device if device is not None else self.W.device)
 
     def forward(self, v: torch.Tensor, u: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """One core step. v, u: (B, N). Returns (v_next, r_next) with r_next = phi(v_next) * keep."""
         r = self.rates(v)
         drive = r @ self.effective_weight() + u + self.b
         alpha = self.alpha(u)

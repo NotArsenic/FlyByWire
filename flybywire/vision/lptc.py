@@ -52,10 +52,10 @@ class LPTCPool(nn.Module):
         return int(self.w.shape[0])
 
     def effective_weights(self) -> torch.Tensor:
-        return self.g[:, :, None] * self.w  # (K, D, P)
+        return self.g[:, :, None] * self.w
 
     def forward(self, t4t5: torch.Tensor) -> torch.Tensor:
-        """t4t5: (..., D, P) raw activity -> (..., K)."""
+        """Project raw T4/T5 activity onto motion channels."""
         x = torch.relu(t4t5.float()) - self.baseline[:, None]
         return torch.einsum("...dp,kdp->...k", x, self.effective_weights())
 
