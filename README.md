@@ -2,10 +2,10 @@
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-2563eb.svg)](environment.yml)
 [![PyTorch cu130](https://img.shields.io/badge/pytorch-2.14%2Bcu130-ea580c.svg)](scripts/setup_env.sh)
-[![Precision fp32](https://img.shields.io/badge/precision-fp32-059669.svg)](flybywire/core/population.py)
-[![Optic Lobe flyvis](https://img.shields.io/badge/optic_lobe-flyvis_flow%2F0000%2F000-d97706.svg)](flybywire/vision/flyvis_stepper.py)
-[![Connectome FlyWire 783](<https://img.shields.io/badge/connectome-FlyWire_v783_(N%3D457)-db2777.svg>)](flybywire/connectome/flywire.py)
-[![Physics PyBullet 200Hz](https://img.shields.io/badge/physics-PyBullet_200Hz-0284c7.svg)](flybywire/envs/corridor.py)
+[![Optic Lobe flyvis](https://img.shields.io/badge/optic_lobe-flyvis_flow%2F0000%2F000-d97706.svg)](https://www.nature.com/articles/s41586-024-07939-3)
+[![Connectome FlyWire 783](<https://img.shields.io/badge/connectome-FlyWire_v783_(N%3D457)-db2777.svg>)](https://www.nature.com/articles/s41586-024-07558-y)
+[![Simulation Env PyBullet 200Hz](https://img.shields.io/badge/simulation_env-PyBullet_200Hz-0284c7.svg)](flybywire/envs/corridor.py)
+[![RL PPO](https://img.shields.io/badge/RL-PPO-16a34a.svg)](flybywire/train/ppo.py)
 [![License MIT](https://img.shields.io/badge/license-MIT-475569.svg)](LICENSE)
 
 **Connectome-constrained visual flight control coupling a frozen _Drosophila_ optic-lobe network (`flyvis`) to a recurrent central-complex circuit wired from the FlyWire adult brain connectome.**
@@ -509,9 +509,9 @@ docs/
 
 ## References
 
-1. **Lappalainen, J. K., Tschopp, F. D., Prakhya, S., McGill, M., Nern, A., Shinomiya, K., Takemura, S., Reiser, M. B., Turaga, S. C., & Srini, S.** (2024). Connectome-constrained networks predict neural activity across the fly visual system. _Nature_, 634, 1132-1140.
-2. **Dorkenwald, S., Matsliah, A., Sterling, A. R., Schlegel, P., Yu, S. C., McKellar, C. E., Lin, A., Costa, M., Eichler, K., Yin, Y., Silversmith, W., Schneider-Mizell, C., Jordan, C. S., & Seung, H. S.** (2024). Neuronal wiring diagram of an adult brain. _Nature_, 634, 124-138.
-3. **Schlegel, P., Yin, Y., Bates, A. S., Dorkenwald, S., Eichler, K., Brooks, P., Han, D. S., Gkantia, M., Dos Santos, M., Munnelly, E. J., Badalamente, G., Serratosa Capdevila, L., Ito, M., & Jefferis, G. S. X. E.** (2024). Whole-brain annotation and multi-connectome cell typing of _Drosophila_. _Nature_, 634, 139-152.
+1. **Lappalainen, J. K., Tschopp, F. D., Prakhya, S., McGill, M., Nern, A., Shinomiya, K., Takemura, S., Reiser, M. B., Turaga, S. C., & Srini, S.** (2024). Connectome-constrained networks predict neural activity across the fly visual system. _Nature_, 634, 1132-1140. [doi:10.1038/s41586-024-07939-3](https://doi.org/10.1038/s41586-024-07939-3)
+2. **Dorkenwald, S., Matsliah, A., Sterling, A. R., Schlegel, P., Yu, S. C., McKellar, C. E., Lin, A., Costa, M., Eichler, K., Yin, Y., Silversmith, W., Schneider-Mizell, C., Jordan, C. S., & Seung, H. S.** (2024). Neuronal wiring diagram of an adult brain. _Nature_, 634, 124-138. [doi:10.1038/s41586-024-07558-y](https://doi.org/10.1038/s41586-024-07558-y)
+3. **Schlegel, P., Yin, Y., Bates, A. S., Dorkenwald, S., Eichler, K., Brooks, P., Han, D. S., Gkantia, M., Dos Santos, M., Munnelly, E. J., Badalamente, G., Serratosa Capdevila, L., Ito, M., & Jefferis, G. S. X. E.** (2024). Whole-brain annotation and multi-connectome cell typing of _Drosophila_. _Nature_, 634, 139-152. [doi:10.1038/s41586-024-07686-5](https://doi.org/10.1038/s41586-024-07686-5)
 4. **Hulse, B. K., Haberkern, H., Franconville, R., Turner-Evans, D. B., Takemura, S., Wolff, T., Noorman, M., Dreher, M., Dan, C., Parekh, R., Hermundstad, A. M., Rubin, G. M., & Jayaraman, V.** (2021). A connectome of the _Drosophila_ central complex reveals network motifs suitable for flexible navigation and context-dependent action selection. _eLife_, 10, e66039.
 5. **Seelig, J. D., & Jayaraman, V.** (2015). Neural dynamics for landmark orientation and angular path integration. _Nature_, 521, 186-191.
 6. **Turner-Evans, D., Wegener, S., Rouault, H., Franconville, R., Wolff, T., Seelig, J. D., Druckmann, S., & Jayaraman, V.** (2017). Angular velocity integration in a fly heading circuit. _eLife_, 6, e23496.
