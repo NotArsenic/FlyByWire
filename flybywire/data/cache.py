@@ -1,16 +1,4 @@
-"""T4/T5 activity cache: ``data/cache/{t4t5_fp16.npy, offsets.npy, manifest.json}``.
-
-* ``t4t5_fp16.npy``: memmap ``(total_T, 8, 721)`` float16, trajectories concatenated in manifest
-  order; episode ``i`` occupies rows ``offsets[i]:offsets[i + 1]``.
-* ``offsets.npy``: ``(n_traj + 1,)`` int64.
-* ``manifest.json``: flyvis model id, dt, cell types, config hash, trajectory file list.
-
-The builder runs a stepper (normally :class:`~flybywire.vision.flyvis_stepper.FlyvisStepper`) over
-batches of 10-20 trajectories, initialised from the grey steady state, slicing out T4/T5 at every
-step (full 45,669-cell responses are never held). Shorter trajectories in a batch are padded
-with grey after their end; padded outputs are discarded. One cache serves every mask condition
-and seed. BC reads only this cache and never runs flyvis.
-"""
+"""T4/T5 activity cache: ``data/cache/{t4t5_fp16.npy, offsets.npy, manifest.json}``."""
 
 from __future__ import annotations
 
@@ -58,7 +46,9 @@ def build_cache(
     offsets = np.concatenate([[0], np.cumsum(lengths)]).astype(np.int64)
     total = int(offsets[-1])
     tmp = out_dir / (CACHE_FILE + ".tmp")
-    mm = np.lib.format.open_memmap(tmp, mode="w+", dtype=np.float16, shape=(total, n_types, n_hexals))
+    mm = np.lib.format.open_memmap(
+        tmp, mode="w+", dtype=np.float16, shape=(total, n_types, n_hexals)
+    )
     t0 = time.time()
     iterator = range(0, len(traj_paths), batch_size)
     if progress:
@@ -122,8 +112,21 @@ class T4T5Cache:
     def trajectories(self) -> list[Path]:
         return [Path(p) for p in self.manifest["trajectories"]]
 
-    def check_compatible(self, model_id: str | None = None, dt: float | None = None) -> None:
-        if model_id is not None and self.manifest.get("flyvis_model") not in (None, model_id):
-            raise ValueError(f"cache built with {self.manifest.get('flyvis_model')}, config wants {model_id}")
-        if dt is not None and self.manifest.get("dt") is not None and abs(self.manifest["dt"] - dt) > 1e-12:
-            raise ValueError(f"cache built with dt={self.manifest['dt']}, config wants {dt}")
+    def check_compatible(
+        self, model_id: str | None = None, dt: float | None = None
+    ) -> None:
+        if model_id is not None and self.manifest.get("flyvis_model") not in (
+            None,
+            model_id,
+        ):
+            raise ValueError(
+                f"cache built with {self.manifest.get('flyvis_model')}, config wants {model_id}"
+            )
+        if (
+            dt is not None
+            and self.manifest.get("dt") is not None
+            and abs(self.manifest["dt"] - dt) > 1e-12
+        ):
+            raise ValueError(
+                f"cache built with dt={self.manifest['dt']}, config wants {dt}"
+            )

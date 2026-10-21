@@ -1,9 +1,4 @@
-"""One policy flight stepped a decision at a time, for the lesion video and the dashboard.
-
-Same pipeline as closed-loop evaluation (BoxEye, flyvis, core, actor mean) on a single env, plus
-what the views need: the EPG ring on the anatomical layout, the decoded and true heading, the
-trail, and a chase-camera image of the drone.
-"""
+"""One policy flight stepped a decision at a time, for the lesion video and the dashboard."""
 
 from __future__ import annotations
 
@@ -17,7 +12,9 @@ from flybywire.eval.ring import bump, model_layout, ring_activity
 
 
 class Flight:
-    def __init__(self, ckpt, seed: int = 10000, device: str | None = None, overrides=()):
+    def __init__(
+        self, ckpt, seed: int = 10000, device: str | None = None, overrides=()
+    ):
         from flybywire.clocks import clocks_from_cfg
         from flybywire.envs.corridor import CorridorEnv
         from flybywire.vision.boxeye import BoxEye
@@ -30,7 +27,11 @@ class Flight:
         self.cfg = OmegaConf.merge(cfg, OmegaConf.from_dotlist(self.overrides))
         self.clocks = clocks_from_cfg(self.cfg)
         self.env = CorridorEnv(self.cfg)
-        self.eye = BoxEye(int(cfg.vision.boxeye.extent), int(cfg.vision.boxeye.kernel_size), device=self.device)
+        self.eye = BoxEye(
+            int(cfg.vision.boxeye.extent),
+            int(cfg.vision.boxeye.kernel_size),
+            device=self.device,
+        )
         self.stepper = FlyvisStepper(
             model=cfg.vision.flyvis_model,
             device=self.device,
@@ -39,9 +40,11 @@ class Flight:
             steady_state_seconds=float(cfg.vision.steady_state_seconds),
         )
         self.layout = model_layout(self.cfg, self.model, "anatomical")
-        self.epg = torch.as_tensor(self.model.groups[self.model.group_roles["heading"]], device=self.device)
+        self.epg = torch.as_tensor(
+            self.model.groups[self.model.group_roles["heading"]], device=self.device
+        )
         self.lesions: tuple[str, ...] = ()
-        # the EB ring has its own zero and handedness: bump angle ~ sign * heading + offset
+
         self.ring_sign, self.ring_offset = 1, 0.0
         self.reset(seed)
 
@@ -65,7 +68,9 @@ class Flight:
 
         self.env.close()
         self.overrides = list(overrides)
-        self.cfg = OmegaConf.merge(self.ckpt_cfg, OmegaConf.from_dotlist(self.overrides))
+        self.cfg = OmegaConf.merge(
+            self.ckpt_cfg, OmegaConf.from_dotlist(self.overrides)
+        )
         self.env = CorridorEnv(self.cfg)
         self.reset(self.seed)
 
@@ -100,7 +105,9 @@ class Flight:
         x = torch.from_numpy(self.frames).to(self.device)
         hexals = self.eye(x).half().float()
         for t in range(hexals.shape[0]):
-            self.v, r = self.model.core_step(self.v, self.stepper.step(hexals[t : t + 1]))
+            self.v, r = self.model.core_step(
+                self.v, self.stepper.step(hexals[t : t + 1])
+            )
         self.ring = ring_activity(r[0, self.epg].cpu().numpy(), self.layout)
         h = self.model.heading(r)[0].cpu().numpy()
         self.decoded = float(np.arctan2(h[0], h[1]))
@@ -112,15 +119,24 @@ class Flight:
         self.yaw = float(info["yaw"][-1])
         if term or trunc:
             self.done = True
-            self.reason = ("collision" if info["collision"] else "end" if info["reached_end"]
-                           else "out_of_bounds" if info["out_of_bounds"] else "time")
+            self.reason = (
+                "collision"
+                if info["collision"]
+                else (
+                    "end"
+                    if info["reached_end"]
+                    else "out_of_bounds" if info["out_of_bounds"] else "time"
+                )
+            )
 
     @property
     def eye_frame(self) -> np.ndarray:
         return self.frames[-1]
 
     def chase_image(self, width: int = 400, height: int = 300) -> np.ndarray:
-        pos, _ = p.getBasePositionAndOrientation(self.env._drone, physicsClientId=self.env._cid)
+        pos, _ = p.getBasePositionAndOrientation(
+            self.env._drone, physicsClientId=self.env._cid
+        )
         return chase_image(self.env._cid, pos, self.yaw, width, height)
 
     def close(self) -> None:
@@ -128,12 +144,28 @@ class Flight:
         self.env.close()
 
 
-def chase_image(cid: int, pos, yaw: float, width: int = 400, height: int = 300) -> np.ndarray:
+def chase_image(
+    cid: int, pos, yaw: float, width: int = 400, height: int = 300
+) -> np.ndarray:
     """Third-person view from behind and above a drone at pos facing yaw (TinyRenderer, RGB)."""
-    view = p.computeViewMatrixFromYawPitchRoll(pos, 0.8, np.degrees(yaw) - 90, -20, 0, 2, physicsClientId=cid)
-    proj = p.computeProjectionMatrixFOV(60, width / height, 0.05, 40, physicsClientId=cid)
-    img = p.getCameraImage(width, height, view, proj, renderer=p.ER_TINY_RENDERER, shadow=0, physicsClientId=cid)[2]
-    return np.ascontiguousarray(np.reshape(img, (height, width, 4))[..., :3], dtype=np.uint8)
+    view = p.computeViewMatrixFromYawPitchRoll(
+        pos, 0.8, np.degrees(yaw) - 90, -20, 0, 2, physicsClientId=cid
+    )
+    proj = p.computeProjectionMatrixFOV(
+        60, width / height, 0.05, 40, physicsClientId=cid
+    )
+    img = p.getCameraImage(
+        width,
+        height,
+        view,
+        proj,
+        renderer=p.ER_TINY_RENDERER,
+        shadow=0,
+        physicsClientId=cid,
+    )[2]
+    return np.ascontiguousarray(
+        np.reshape(img, (height, width, 4))[..., :3], dtype=np.uint8
+    )
 
 
 def draw(fig, flight: Flight, title: str = "") -> None:
@@ -141,8 +173,17 @@ def draw(fig, flight: Flight, title: str = "") -> None:
     from matplotlib.patches import Circle, Rectangle
 
     fig.clear()
-    grid = fig.add_gridspec(2, 3, height_ratios=[1.3, 1], left=0.02, right=0.98, top=0.93, bottom=0.03,
-                            wspace=0.08, hspace=0.18)
+    grid = fig.add_gridspec(
+        2,
+        3,
+        height_ratios=[1.3, 1],
+        left=0.02,
+        right=0.98,
+        top=0.93,
+        bottom=0.03,
+        wspace=0.08,
+        hspace=0.18,
+    )
     ax_chase = fig.add_subplot(grid[0, :2])
     ax_ring = fig.add_subplot(grid[0, 2], projection="polar")
     ax_eye = fig.add_subplot(grid[1, 0])
@@ -151,8 +192,12 @@ def draw(fig, flight: Flight, title: str = "") -> None:
     ax_chase.imshow(flight.chase_image())
     ax_chase.axis("off")
     lesion = "+".join(flight.lesions) if flight.lesions else "none"
-    ax_chase.set_title(f"{title}t = {flight.time:4.1f} s    lesion: {lesion}", loc="left", fontsize=13,
-                       color="crimson" if flight.lesions else "black")
+    ax_chase.set_title(
+        f"{title}t = {flight.time:4.1f} s    lesion: {lesion}",
+        loc="left",
+        fontsize=13,
+        color="crimson" if flight.lesions else "black",
+    )
 
     ax_eye.imshow(flight.eye_frame, cmap="gray", vmin=0, vmax=255)
     ax_eye.set_title("what the eye sees", fontsize=9)
@@ -160,12 +205,21 @@ def draw(fig, flight: Flight, title: str = "") -> None:
 
     c = flight.cfg.env.corridor
     for kind, x, y, hx, hy in flight.obstacles:
-        ax_map.add_patch(Circle((x, y), hx, color="0.45") if kind == 0
-                         else Rectangle((x - hx, y - hy), 2 * hx, 2 * hy, color="0.45"))
+        ax_map.add_patch(
+            Circle((x, y), hx, color="0.45")
+            if kind == 0
+            else Rectangle((x - hx, y - hy), 2 * hx, 2 * hy, color="0.45")
+        )
     trail = np.asarray(flight.trail)
     ax_map.plot(trail[:, 0], trail[:, 1], "b-", lw=1)
     ax_map.plot(*trail[-1], "bo", ms=4)
-    ax_map.arrow(*trail[-1], 0.8 * np.cos(flight.yaw), 0.8 * np.sin(flight.yaw), color="b", width=0.03)
+    ax_map.arrow(
+        *trail[-1],
+        0.8 * np.cos(flight.yaw),
+        0.8 * np.sin(flight.yaw),
+        color="b",
+        width=0.03,
+    )
     ax_map.axhline(c.width_m / 2, color="k")
     ax_map.axhline(-c.width_m / 2, color="k")
     ax_map.set_xlim(0, c.length_m)
@@ -178,14 +232,25 @@ def draw(fig, flight: Flight, title: str = "") -> None:
     ring = np.nan_to_num(flight.ring)
     vmax = max(ring.max(), 1e-6)
     theta = (np.arange(n) + 0.5) * 2 * np.pi / n
-    ax_ring.bar(theta, ring / vmax, width=2 * np.pi / n * 0.92, bottom=0.25, color=_viridis(ring / vmax))
-    on_ring = [flight.ring_sign * a + flight.ring_offset for a in (flight.true_heading, flight.decoded)]
+    ax_ring.bar(
+        theta,
+        ring / vmax,
+        width=2 * np.pi / n * 0.92,
+        bottom=0.25,
+        color=_viridis(ring / vmax),
+    )
+    on_ring = [
+        flight.ring_sign * a + flight.ring_offset
+        for a in (flight.true_heading, flight.decoded)
+    ]
     ax_ring.plot([on_ring[0]] * 2, [0, 1.3], "r-", lw=2, label="true heading")
     ax_ring.plot([on_ring[1]] * 2, [0, 1.3], "c--", lw=2, label="decoded from EPG")
     ax_ring.set_ylim(0, 1.35)
     ax_ring.set_yticks([])
     ax_ring.set_xticks([])
-    ax_ring.set_title(f"EPG ring, anatomical EB layout\nbump share {flight.share:.2f}", fontsize=9)
+    ax_ring.set_title(
+        f"EPG ring, anatomical EB layout\nbump share {flight.share:.2f}", fontsize=9
+    )
     ax_ring.legend(loc="lower center", fontsize=7, bbox_to_anchor=(0.5, -0.32), ncol=2)
 
 

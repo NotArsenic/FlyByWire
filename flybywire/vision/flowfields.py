@@ -1,31 +1,19 @@
-"""Ego-motion optic-flow templates (Longuet-Higgins & Prazdny 1980) at hexal / pixel positions.
-
-Image coordinates (focal-length units): ``x`` right, ``y`` down; the optical axis is ``Z``
-(forward). For a camera translating with ``T`` and rotating with ``W`` (camera frame) past a
-static point at depth ``Z``, the image flow is::
-
-    u = (-Tx + x Tz) / Z + Wx x y - Wy (1 + x^2) + Wz y
-    v = (-Ty + y Tz) / Z + Wx (1 + y^2) - Wy x y - Wz x
-
-Translation templates assume unit depth (``Z = 1``).
-
-Self-motion channels are defined in the drone **body frame** (FLU: x forward, y left, z up),
-right-handed: ``roll`` about +x, ``pitch`` about +y, ``yaw`` about +z (positive = turning left),
-``forward`` +x, ``lateral`` +y (left), ``vertical`` +z (up). They are rotated into the camera frame
-(camera pitched down by ``tilt_deg``). ``loom_left`` / ``loom_right`` are the forward-translation
-field restricted to the left (``x < 0``) / right (``x > 0``) image half.
-
-Hexal positions come from ``flyvis.utils.hex_utils.get_hex_coords`` mapped through the BoxEye
-receptor geometry (``row = d (u + v/2)``, ``col = d v`` on a ``min_frame_size`` grid that the
-whole frame is resized onto), then to normalised image coordinates and finally to focal units for
-a pinhole camera with field of view ``fov_deg``.
-"""
+"""Ego-motion optic-flow templates (Longuet-Higgins & Prazdny 1980) at hexal / pixel positions."""
 
 from __future__ import annotations
 
 import numpy as np
 
-CHANNELS = ("yaw", "pitch", "roll", "forward", "lateral", "vertical", "loom_left", "loom_right")
+CHANNELS = (
+    "yaw",
+    "pitch",
+    "roll",
+    "forward",
+    "lateral",
+    "vertical",
+    "loom_left",
+    "loom_right",
+)
 
 
 def hex_coords(extent: int) -> tuple[np.ndarray, np.ndarray]:
@@ -35,7 +23,7 @@ def hex_coords(extent: int) -> tuple[np.ndarray, np.ndarray]:
     try:
         import_flyvis()
         from flyvis.utils.hex_utils import get_hex_coords
-    except ImportError:  # pragma: no cover - identical fallback (verified against flyvis 1.2.0)
+    except ImportError:  # pragma: no cover - identical fallback
         u, v = [], []
         for q in range(-extent, extent + 1):
             for r in range(max(-extent, -extent - q), min(extent, extent - q) + 1):
@@ -51,8 +39,6 @@ def hexal_normalized_coords(extent: int = 15, kernel_size: int = 13) -> np.ndarr
     u, v = hex_coords(extent)
     row = kernel_size * (u + v / 2.0)
     col = kernel_size * v.astype(float)
-    # BoxEye min_frame_size = span of receptor centres + 1; frame is resized onto it and the
-    # centre pixel is index size // 2. Pixel-centre normalisation: (idx + 0.5) / size * 2 - 1.
     h = int(row.max() - row.min()) + 1
     w = int(col.max() - col.min()) + 1
     y = ((row + h // 2) + 0.5) / h * 2 - 1
@@ -76,7 +62,9 @@ def body_to_camera_rotation(tilt_deg: float = 0.0) -> np.ndarray:
     )
 
 
-def egomotion_flow(xy: np.ndarray, T_cam: np.ndarray, W_cam: np.ndarray, depth: float = 1.0) -> np.ndarray:
+def egomotion_flow(
+    xy: np.ndarray, T_cam: np.ndarray, W_cam: np.ndarray, depth: float = 1.0
+) -> np.ndarray:
     """Image flow (n, 2) at focal-unit points ``xy`` for camera translation T and rotation W."""
     x, y = xy[:, 0], xy[:, 1]
     tx, ty, tz = T_cam
@@ -90,7 +78,11 @@ def channel_flow(xy: np.ndarray, channel: str, tilt_deg: float = 0.0) -> np.ndar
     """Flow field for unit positive self-motion in ``channel`` (body frame), at focal-unit points."""
     R = body_to_camera_rotation(tilt_deg)
     zero = np.zeros(3)
-    axes = {"x": np.array([1.0, 0, 0]), "y": np.array([0, 1.0, 0]), "z": np.array([0, 0, 1.0])}
+    axes = {
+        "x": np.array([1.0, 0, 0]),
+        "y": np.array([0, 1.0, 0]),
+        "z": np.array([0, 0, 1.0]),
+    }
     if channel in ("yaw", "pitch", "roll"):
         ax = {"roll": "x", "pitch": "y", "yaw": "z"}[channel]
         return egomotion_flow(xy, zero, R @ axes[ax])
@@ -104,13 +96,19 @@ def channel_flow(xy: np.ndarray, channel: str, tilt_deg: float = 0.0) -> np.ndar
     raise ValueError(f"unknown channel {channel!r}")
 
 
-def flow_templates(xy: np.ndarray, channels=CHANNELS, tilt_deg: float = 0.0) -> np.ndarray:
+def flow_templates(
+    xy: np.ndarray, channels=CHANNELS, tilt_deg: float = 0.0
+) -> np.ndarray:
     """(n_channels, n_points, 2) flow fields."""
     return np.stack([channel_flow(xy, c, tilt_deg) for c in channels])
 
 
 def hexal_flow_templates(
-    extent: int = 15, kernel_size: int = 13, fov_deg: float = 110.0, tilt_deg: float = 0.0, channels=CHANNELS
+    extent: int = 15,
+    kernel_size: int = 13,
+    fov_deg: float = 110.0,
+    tilt_deg: float = 0.0,
+    channels=CHANNELS,
 ) -> np.ndarray:
     xy = normalized_to_focal(hexal_normalized_coords(extent, kernel_size), fov_deg)
     return flow_templates(xy, channels, tilt_deg)

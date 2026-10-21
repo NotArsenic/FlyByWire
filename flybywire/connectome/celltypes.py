@@ -1,7 +1,4 @@
-"""Connectome container, cell-type group matching, and npz I/O.
-
-Convention (used everywhere): ``M[i, j] = True`` iff **presynaptic i -> postsynaptic j**.
-"""
+"""Connectome container, cell-type group matching, and npz I/O."""
 
 from __future__ import annotations
 
@@ -28,10 +25,16 @@ class Connectome:
         n = self.M.shape[0]
         if self.M.shape != (n, n):
             raise ValueError(f"M must be square, got {self.M.shape}")
-        for name, arr in (("neuron_ids", self.neuron_ids), ("types", self.types), ("instances", self.instances)):
+        for name, arr in (
+            ("neuron_ids", self.neuron_ids),
+            ("types", self.types),
+            ("instances", self.instances),
+        ):
             if len(arr) != n:
                 raise ValueError(f"{name} has length {len(arr)}, expected N={n}")
-        self.groups = {k: np.asarray(sorted(v), dtype=np.int64) for k, v in self.groups.items()}
+        self.groups = {
+            k: np.asarray(sorted(v), dtype=np.int64) for k, v in self.groups.items()
+        }
 
     @property
     def n(self) -> int:
@@ -53,7 +56,12 @@ class Connectome:
         return self.M.sum(axis=1)
 
     def with_mask(self, M: np.ndarray, **meta) -> Connectome:
-        return replace(self, M=np.asarray(M, dtype=bool), groups=dict(self.groups), meta={**self.meta, **meta})
+        return replace(
+            self,
+            M=np.asarray(M, dtype=bool),
+            groups=dict(self.groups),
+            meta={**self.meta, **meta},
+        )
 
     def summary_table(self) -> str:
         lines = [f"{'group':<8} {'n':>6}  types"]
@@ -61,7 +69,9 @@ class Connectome:
             tnames = sorted(set(self.types[idx].tolist()))
             shown = ", ".join(tnames[:8]) + (" ..." if len(tnames) > 8 else "")
             lines.append(f"{g:<8} {len(idx):>6}  {shown}")
-        lines.append(f"N={self.n}  edges={self.n_edges}  density={self.density:.4f}  source={self.source}")
+        lines.append(
+            f"N={self.n}  edges={self.n_edges}  density={self.density:.4f}  source={self.source}"
+        )
         return "\n".join(lines)
 
     def save(self, path: str | Path) -> None:
@@ -93,10 +103,12 @@ class Connectome:
             )
 
 
-def match_groups(types: Sequence[str], patterns: Mapping[str, Sequence[str]]) -> dict[str, np.ndarray]:
+def match_groups(
+    types: Sequence[str], patterns: Mapping[str, Sequence[str]]
+) -> dict[str, np.ndarray]:
     """Assign neurons to groups by fnmatch patterns on their type label.
 
-    Raises if a neuron matches more than one group (groups must be disjoint so lesions are clean).
+    Raises if a neuron matches more than one group.
     """
     types = [str(t) for t in types]
     owner: dict[int, str] = {}
@@ -105,8 +117,9 @@ def match_groups(types: Sequence[str], patterns: Mapping[str, Sequence[str]]) ->
         for i, t in enumerate(types):
             if any(fnmatch.fnmatchcase(t, p) for p in pats):
                 if i in owner and owner[i] != g:
-                    raise ValueError(f"neuron {i} (type {t!r}) matches both {owner[i]!r} and {g!r}")
+                    raise ValueError(
+                        f"neuron {i} (type {t!r}) matches both {owner[i]!r} and {g!r}"
+                    )
                 owner[i] = g
                 groups[g].append(i)
     return {g: np.asarray(v, dtype=np.int64) for g, v in groups.items()}
-

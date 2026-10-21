@@ -1,27 +1,4 @@
-"""Stateful, frozen flyvis stepper with per-env state reset.
-
-**This is the gradient boundary.** The network is loaded in eval mode, every parameter has
-``requires_grad=False``, and every step runs under ``torch.no_grad()``.
-
-API facts verified in the installed flyvis 1.2.0 source (``flyvis/network/network.py``):
-
-* ``Network.forward(x, dt, state=None, as_states=False)`` integrates ``x`` of shape
-  ``(B, T, n_nodes)`` with explicit Euler; with ``as_states=True`` it returns the list of per-step
-  states and the last one can be passed back as ``state=`` -> state carries across calls.
-* ``forward`` re-runs ``clamp()`` and ``_param_api()`` on every call. For a frozen network the
-  parameter namespace is constant, so the ``fast`` mode computes it once and calls the lower-level
-  ``Network._next_state(params, state, x_t, dt)`` per step (identical arithmetic; equivalence is
-  checked by ``scripts/gate1_flyvis_spike.py``).
-* For ``PPNeuronIGRSynapses`` dynamics the full state is ``state.nodes.activity`` (B, n_nodes)
-  (membrane voltage; edges carry no state). We therefore keep only that tensor and rebuild the
-  state namespace with ``Network._state_api`` each step.
-* Photoreceptor input: the stimulus buffer is ``(B, T, n_nodes)``; hexal input ``(B, 721)`` is
-  written to ``stimulus.input_index`` (R1-R8, shape (8, 721)), broadcast over the 8 types.
-* ``Network.steady_state(t_pre, dt, batch_size, value=0.5)`` integrates a uniform grey stimulus.
-
-Outputs are the raw ``activity`` (voltage) of T4a-d / T5a-d, shape ``(B, 8, 721)``, in the
-``get_hex_coords(15)`` hexal order (same order as BoxEye output).
-"""
+"""Stateful, frozen flyvis stepper with per-env state reset."""
 
 from __future__ import annotations
 
@@ -67,19 +44,30 @@ class FlyvisStepper:
         self.n_nodes = int(net.n_nodes)
 
         c = net.connectome
-        self._input_index = torch.as_tensor(net.stimulus.input_index, device=self.device)
+        self._input_index = torch.as_tensor(
+            net.stimulus.input_index, device=self.device
+        )
         self.n_hexals = int(self._input_index.shape[1])
-        idx = [torch.as_tensor(c.nodes.layer_index[t][:], device=self.device) for t in self.cell_types]
+        idx = [
+            torch.as_tensor(c.nodes.layer_index[t][:], device=self.device)
+            for t in self.cell_types
+        ]
         if any(len(i) != self.n_hexals for i in idx):
-            raise RuntimeError("T4/T5 cell counts differ from the number of input hexals")
+            raise RuntimeError(
+                "T4/T5 cell counts differ from the number of input hexals"
+            )
         self._out_index = torch.stack(idx)
 
         with torch.no_grad(), torch.device(self.device):
             net.clamp()
             self._params = net._param_api()
-            ss = net.steady_state(self.steady_state_seconds, self.dt, batch_size=1, value=self.grey_value)
+            ss = net.steady_state(
+                self.steady_state_seconds, self.dt, batch_size=1, value=self.grey_value
+            )
             if len(ss.edges):
-                raise RuntimeError("flyvis dynamics carry edge state; stepper assumes node-only state")
+                raise RuntimeError(
+                    "flyvis dynamics carry edge state; stepper assumes node-only state"
+                )
             self._steady = ss.nodes.activity[0].detach().clone()
         self.state: torch.Tensor | None = None
         from flyvis.utils.tensor_utils import AutoDeref
@@ -93,7 +81,11 @@ class FlyvisStepper:
     def steady_state(self, batch_size: int) -> torch.Tensor:
         return self._steady.expand(batch_size, -1).clone()
 
-    def reset(self, batch_size: int | None = None, env_ids: Sequence[int] | torch.Tensor | None = None) -> None:
+    def reset(
+        self,
+        batch_size: int | None = None,
+        env_ids: Sequence[int] | torch.Tensor | None = None,
+    ) -> None:
         """Reset all envs (``env_ids=None``) or only ``env_ids`` to the cached grey steady state."""
         if env_ids is None:
             b = batch_size if batch_size is not None else self.batch_size
@@ -102,8 +94,12 @@ class FlyvisStepper:
             self.state = self.steady_state(b)
             return
         if self.state is None:
-            raise RuntimeError("call reset(batch_size) before resetting individual envs")
-        self.state[torch.as_tensor(env_ids, device=self.device, dtype=torch.long)] = self._steady
+            raise RuntimeError(
+                "call reset(batch_size) before resetting individual envs"
+            )
+        self.state[torch.as_tensor(env_ids, device=self.device, dtype=torch.long)] = (
+            self._steady
+        )
 
     def readout(self, activity: torch.Tensor) -> torch.Tensor:
         """(B, n_nodes) -> (B, 8, 721) T4/T5 activity."""
@@ -116,14 +112,18 @@ class FlyvisStepper:
 
     @torch.no_grad()
     def step(self, hexals: torch.Tensor) -> torch.Tensor:
-        """Advance one ``dt`` with a fresh frame. ``hexals``: (B, 721) in [0, 1]. Returns (B, 8, 721)."""
+        """Advance one ``dt`` with a fresh frame. hexals: (B, 721) in [0, 1]. Returns (B, 8, 721)."""
         hexals = torch.as_tensor(hexals, device=self.device).float()
         if self.state is None or self.state.shape[0] != hexals.shape[0]:
             self.reset(hexals.shape[0])
         net = self.net
         with torch.device(self.device):
             x_t = self._stimulus(hexals)
-            st = net._state_api(self._AutoDeref(nodes=self._AutoDeref(activity=self.state), edges=self._AutoDeref()))
+            st = net._state_api(
+                self._AutoDeref(
+                    nodes=self._AutoDeref(activity=self.state), edges=self._AutoDeref()
+                )
+            )
             if self.mode == "fast":
                 nxt = net._next_state(self._params, st, x_t, self.dt)
             else:
@@ -133,22 +133,28 @@ class FlyvisStepper:
 
     @torch.no_grad()
     def run_sequence(self, hexals: torch.Tensor, reset: bool = True) -> torch.Tensor:
-        """Step through ``(B, T, 721)``; returns ``(B, T, 8, 721)``. Never stores full node activity."""
+        """Step through (B, T, 721); returns (B, T, 8, 721). Never stores full node activity."""
         hexals = torch.as_tensor(hexals, device=self.device).float()
         if reset:
             self.reset(hexals.shape[0])
-        return torch.stack([self.step(hexals[:, t]) for t in range(hexals.shape[1])], dim=1)
+        return torch.stack(
+            [self.step(hexals[:, t]) for t in range(hexals.shape[1])], dim=1
+        )
 
     @torch.no_grad()
     def full_sequence_reference(self, hexals: torch.Tensor) -> torch.Tensor:
-        """One ``Network.forward`` call over the whole sequence from the grey steady state."""
+        """One Network.forward call over the whole sequence from the grey steady state."""
         hexals = torch.as_tensor(hexals, device=self.device).float()
         b, t, _ = hexals.shape
         AutoDeref = self._AutoDeref
         with torch.device(self.device):
             x = torch.zeros(b, t, self.n_nodes, device=self.device)
             x[:, :, self._input_index] = hexals[:, :, None, :]
-            st = self.net._state_api(AutoDeref(nodes=AutoDeref(activity=self.steady_state(b)), edges=AutoDeref()))
+            st = self.net._state_api(
+                AutoDeref(
+                    nodes=AutoDeref(activity=self.steady_state(b)), edges=AutoDeref()
+                )
+            )
             act = self.net.forward(x, self.dt, state=st, as_states=False)
         return act[:, :, self._out_index]
 

@@ -1,12 +1,4 @@
-"""Heading-decode metrics.
-
-* :func:`heading_r2`: R^2 computed jointly on (sin, cos),
-  ``1 - sum |pred - target|^2 / sum |target - mean(target)|^2`` over all samples and both components.
-* :func:`angular_error_deg`: mean absolute wrapped angular error in degrees between
-  ``atan2(sin, cos)`` of prediction and target.
-* :func:`lagged_heading_r2`: the same R^2 with the target shifted back in time.
-* :func:`wilson_interval`: confidence interval for a success rate.
-"""
+"""Heading-decode metrics."""
 
 from __future__ import annotations
 
@@ -44,8 +36,8 @@ def angular_error_deg(pred, target, mask=None) -> float:
 def lagged_heading_r2(preds, targets, lags) -> list[float]:
     """R^2 of the decoded heading at t against the true heading at t - lag, one value per lag.
 
-    preds and targets are lists of per-episode (T, 2) arrays. A decoder that sees the heading late
-    scores best at a positive lag.
+    preds and targets are lists of per-episode (T, 2) arrays.
+    A decoder that sees the heading late scores best at a positive lag.
     """
     return [
         heading_r2(

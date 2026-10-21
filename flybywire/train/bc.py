@@ -1,19 +1,6 @@
-"""Behavior cloning from the T4/T5 cache (never runs flyvis).
+"""Behavior cloning from the T4/T5 cache.
 
-* Whole episodes from step 0 (heading is relative to episode start, so the core must integrate
-  from t = 0); episodes in a batch are zero-padded and the padding is masked out of the loss.
-* Truncated BPTT over windows of ``bc.tbptt_core_steps`` core steps: state carried across
-  windows, detached at each boundary; one optimizer update per window.
-* Loss = MSE(actor mean, expert action) at decision steps (``Clocks``)
-  + ``aux_weight`` * MSE(heading decoder, (sin, cos)(rel_yaw)) at every core step.
-* Adam (``bc.lr``), grad-norm clipping (``bc.grad_clip``), ``bc.batch_episodes`` episodes per batch.
-* The validation episodes are scored after every epoch; the epoch with the best validation heading
-  R^2 is also saved as ``model_best.pt``.
-* fp32 compute: the fp16 cache is upcast per window.
-* ``bc.pauses`` (off when absent) splices synthetic pauses into the training episodes
-  (``flybywire/data/pause_bank.py``, D39); validation and test episodes are never spliced.
-
-CLI::
+CLI:
 
     python -m flybywire.train.bc --cache data/cache --out runs/bc/real_s0 [key=value ...]
 """
@@ -47,7 +34,9 @@ class EpisodeTargets:
 class BCData:
     """Cache-backed episodes plus their BC targets."""
 
-    def __init__(self, cache: T4T5Cache, clocks: Clocks, pauses: PauseSampler | None = None):
+    def __init__(
+        self, cache: T4T5Cache, clocks: Clocks, pauses: PauseSampler | None = None
+    ):
         self.cache = cache
         self.clocks = clocks
         self.pauses = pauses
@@ -57,20 +46,33 @@ class BCData:
         for i, p in enumerate(cache.trajectories):
             tr = Trajectory.load(p, load_hexals=False)
             if len(tr.rel_yaw) != cache.length(i):
-                raise ValueError(f"{p}: {len(tr.rel_yaw)} steps but cache has {cache.length(i)}")
+                raise ValueError(
+                    f"{p}: {len(tr.rel_yaw)} steps but cache has {cache.length(i)}"
+                )
             if clocks.n_core_steps(tr.n_decisions) != cache.length(i):
                 raise ValueError(f"{p}: decision/core-step alignment mismatch")
             self.targets.append(
-                EpisodeTargets(tr.actions.astype(np.float32), heading_target(tr.rel_yaw).astype(np.float32))
+                EpisodeTargets(
+                    tr.actions.astype(np.float32),
+                    heading_target(tr.rel_yaw).astype(np.float32),
+                )
             )
 
     def __len__(self) -> int:
         return len(self.targets)
 
     def episode(self, i, rng=None):
-        """Frames, heading targets, actions and action mask of episode i, with pauses if ``rng`` is given."""
-        frames, heading, actions = self.cache.episode(i), self.targets[i].heading, self.targets[i].actions
-        entries = self.pauses.draw(i, rng) if self.pauses is not None and rng is not None else []
+        """Frames, heading targets, actions and action mask of episode i, with pauses if rng is given."""
+        frames, heading, actions = (
+            self.cache.episode(i),
+            self.targets[i].heading,
+            self.targets[i].actions,
+        )
+        entries = (
+            self.pauses.draw(i, rng)
+            if self.pauses is not None and rng is not None
+            else []
+        )
         if len(entries) == 0:
             return frames, heading, actions, np.ones(len(actions), dtype=bool)
         return splice(frames, heading, actions, self.pauses.bank, entries, self.clocks)
@@ -94,11 +96,19 @@ class BCData:
             mask[j, :t] = True
             act[j, :k] = actions
             amask[j, :k] = action_mask
-        to = lambda a: torch.from_numpy(a).to(device)  # noqa: E731
-        return {"x16": to(x), "heading": to(head), "mask": to(mask), "actions": to(act), "amask": to(amask)}
+        to = lambda a: torch.from_numpy(a).to(device)
+        return {
+            "x16": to(x),
+            "heading": to(head),
+            "mask": to(mask),
+            "actions": to(act),
+            "amask": to(amask),
+        }
 
 
-def _masked_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+def _masked_mse(
+    pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor
+) -> torch.Tensor:
     m = mask.to(pred.dtype).unsqueeze(-1)
     denom = m.sum() * pred.shape[-1]
     return ((pred - target) ** 2 * m).sum() / denom.clamp_min(1.0)
@@ -113,7 +123,9 @@ def window_loss(model, batch, v, s, e, aux_weight, clocks):
 
 
 @torch.no_grad()
-def evaluate(model, data: BCData, idx, device, batch_episodes: int = 32) -> dict[str, float]:
+def evaluate(
+    model, data: BCData, idx, device, batch_episodes: int = 32
+) -> dict[str, float]:
     model.eval()
     preds, targets, masks, aerr = [], [], [], []
     for start in range(0, len(idx), batch_episodes):
@@ -153,10 +165,8 @@ def train_bc(
     lptc=None,
     init: str | None = None,
 ) -> dict:
-    """Train BC; ``conn`` / ``lptc`` override the config-built connectome / LPTC (tests, smoke).
-
-    ``init`` starts from a checkpoint's weights instead of a fresh network (a later curriculum stage);
-    the config must build the same network.
+    """Train BC; conn / lptc override the config-built connectome / LPTC (tests, smoke).
+    Returns a dict with keys "history", "metrics" and "model".
     """
     from flybywire.core.model import build_model
 
@@ -170,10 +180,16 @@ def train_bc(
     cache = T4T5Cache(cache_dir)
     cache.check_compatible(cfg.vision.flyvis_model, clocks.dt_sensory)
     pcfg = OmegaConf.select(cfg, "bc.pauses", default=None)
-    sampler = PauseSampler(PauseBank(pcfg.bank), int(pcfg.per_episode), float(pcfg.p)) if pcfg else None
+    sampler = (
+        PauseSampler(PauseBank(pcfg.bank), int(pcfg.per_episode), float(pcfg.p))
+        if pcfg
+        else None
+    )
     data = BCData(cache, clocks, sampler)
     rng = np.random.default_rng(int(cfg.seed))
-    pause_rng = np.random.default_rng([int(cfg.seed), 1])  # separate, so the epoch order matches a run without pauses
+    pause_rng = np.random.default_rng(
+        [int(cfg.seed), 1]
+    )  # separate, so the epoch order matches a run without pauses
     order = rng.permutation(len(data))
     n_val = int(round(val_fraction * len(data))) if len(data) >= 10 else 0
     val_idx, train_idx = order[:n_val].tolist(), order[n_val:].tolist()
@@ -181,7 +197,11 @@ def train_bc(
     model = build_model(cfg, conn=conn, lptc=lptc, verbose=verbose).to(device)
     if init is not None:
         model.load_state_dict(torch.load(init, map_location=device)["model"])
-    params = [p for n, p in model.named_parameters() if not n.startswith("critic.") and n != "actor.log_std"]
+    params = [
+        p
+        for n, p in model.named_parameters()
+        if not n.startswith("critic.") and n != "actor.log_std"
+    ]
     opt = torch.optim.Adam(params, lr=float(cfg.bc.lr))
     bcfg = cfg.bc
     aux = float(bcfg.aux_weight)
@@ -192,11 +212,21 @@ def train_bc(
     if use_wandb and cfg.logging.wandb_mode != "disabled":
         import wandb
 
-        run = wandb.init(project="flybywire", mode=cfg.logging.wandb_mode, dir=str(out_dir),
-                         config=OmegaConf.to_container(cfg, resolve=True))
+        run = wandb.init(
+            project="flybywire",
+            mode=cfg.logging.wandb_mode,
+            dir=str(out_dir),
+            config=OmegaConf.to_container(cfg, resolve=True),
+        )
 
     def save(name: str) -> None:
-        torch.save({"model": model.state_dict(), "config": OmegaConf.to_container(cfg, resolve=True)}, out_dir / name)
+        torch.save(
+            {
+                "model": model.state_dict(),
+                "config": OmegaConf.to_container(cfg, resolve=True),
+            },
+            out_dir / name,
+        )
 
     history = []
     best = {"epoch": None, "heading_r2": -math.inf}
@@ -208,7 +238,9 @@ def train_bc(
             idx = perm[start : start + int(bcfg.batch_episodes)]
             batch = data.batch(idx, device, pause_rng)
             v = model.init_state(len(idx))
-            for s, e in clocks.windows(batch["x16"].shape[1], int(bcfg.tbptt_core_steps)):
+            for s, e in clocks.windows(
+                batch["x16"].shape[1], int(bcfg.tbptt_core_steps)
+            ):
                 if not bool(batch["mask"][:, s:e].any()):
                     break
                 loss, la, lh, out = window_loss(model, batch, v, s, e, aux, clocks)
@@ -217,16 +249,29 @@ def train_bc(
                 gnorm = torch.nn.utils.clip_grad_norm_(params, float(bcfg.grad_clip))
                 opt.step()
                 v = out["v"].detach()
-                rec = {"update": update, "epoch": epoch, "loss": loss.item(), "action_mse": la.item(),
-                       "heading_mse": lh.item(), "grad_norm": float(gnorm), "window_start": s}
-                if not all(math.isfinite(rec[k]) for k in ("loss", "action_mse", "heading_mse")):
-                    raise FloatingPointError(f"non-finite loss at update {update}: {rec}")
+                rec = {
+                    "update": update,
+                    "epoch": epoch,
+                    "loss": loss.item(),
+                    "action_mse": la.item(),
+                    "heading_mse": lh.item(),
+                    "grad_norm": float(gnorm),
+                    "window_start": s,
+                }
+                if not all(
+                    math.isfinite(rec[k]) for k in ("loss", "action_mse", "heading_mse")
+                ):
+                    raise FloatingPointError(
+                        f"non-finite loss at update {update}: {rec}"
+                    )
                 history.append(rec)
                 if run is not None:
                     run.log(rec, step=update)
                 if verbose and update % log_every == 0:
-                    print(f"[bc] upd {update:5d} ep {epoch:3d} loss {rec['loss']:.4f} "
-                          f"act {rec['action_mse']:.4f} head {rec['heading_mse']:.4f} |g| {rec['grad_norm']:.3f}")
+                    print(
+                        f"[bc] upd {update:5d} ep {epoch:3d} loss {rec['loss']:.4f} "
+                        f"act {rec['action_mse']:.4f} head {rec['heading_mse']:.4f} |g| {rec['grad_norm']:.3f}"
+                    )
                 update += 1
                 if update >= max_updates:
                     break
@@ -241,8 +286,10 @@ def train_bc(
             if run is not None:
                 run.log({f"val_{k}": v for k, v in val.items()}, step=update)
             if verbose:
-                print(f"[bc] epoch {epoch:3d} val heading R2 {val['heading_r2']:.3f} "
-                      f"err {val['heading_err_deg']:.2f} deg act {val['action_mse']:.4f} (best epoch {best['epoch']})")
+                print(
+                    f"[bc] epoch {epoch:3d} val heading R2 {val['heading_r2']:.3f} "
+                    f"err {val['heading_err_deg']:.2f} deg act {val['action_mse']:.4f} (best epoch {best['epoch']})"
+                )
         if update >= max_updates:
             break
 
@@ -258,8 +305,17 @@ def train_bc(
         "seed": int(cfg.seed),
         "cache": str(Path(cache_dir).resolve()),
         **({"init": str(init)} if init else {}),
-        **({"pauses": {"bank": str(sampler.bank.dir.resolve()), "per_episode": sampler.per_episode, "p": sampler.p}}
-           if sampler else {}),
+        **(
+            {
+                "pauses": {
+                    "bank": str(sampler.bank.dir.resolve()),
+                    "per_episode": sampler.per_episode,
+                    "p": sampler.p,
+                }
+            }
+            if sampler
+            else {}
+        ),
     }
     save("model.pt")
     (out_dir / "history.json").write_text(json.dumps(history))
@@ -277,18 +333,34 @@ def main(argv=None) -> int:
     from flybywire.config import data_dir, load_config
 
     ap = argparse.ArgumentParser(description="Behavior cloning from the T4/T5 cache")
-    ap.add_argument("--cache", default=None, help="cache dir (default: <data_dir>/cache)")
+    ap.add_argument(
+        "--cache", default=None, help="cache dir (default: <data_dir>/cache)"
+    )
     ap.add_argument("--out", required=True)
     ap.add_argument("--config", default=None)
-    ap.add_argument("--updates", type=int, default=None, help="stop after N optimizer updates")
+    ap.add_argument(
+        "--updates", type=int, default=None, help="stop after N optimizer updates"
+    )
     ap.add_argument("--device", default=None)
     ap.add_argument("--wandb", action="store_true")
-    ap.add_argument("--init", default=None, help="checkpoint to start from instead of a fresh network")
+    ap.add_argument(
+        "--init",
+        default=None,
+        help="checkpoint to start from instead of a fresh network",
+    )
     ap.add_argument("overrides", nargs="*")
     args = ap.parse_args(argv)
     cfg = load_config(args.config, args.overrides)
     cache = args.cache or str(data_dir(cfg) / "cache")
-    train_bc(cfg, cache, args.out, n_updates=args.updates, device=args.device, use_wandb=args.wandb, init=args.init)
+    train_bc(
+        cfg,
+        cache,
+        args.out,
+        n_updates=args.updates,
+        device=args.device,
+        use_wandb=args.wandb,
+        init=args.init,
+    )
     return 0
 
 

@@ -1,14 +1,4 @@
-"""Farneback fallback vision backend (``vision.backend: farneback``).
-
-Computes dense optical flow between consecutive frames with OpenCV's Farneback method and projects
-it onto the same 8 self-motion flow templates used by the LPTC layer, evaluated on the pixel grid:
-``s_k = <f_k, flow>`` with ``f_k`` the template scaled to unit L2 norm. Output is ``(B, 8)`` directly, so
-everything downstream (InputProjection, core, heads) is unchanged. Stateful per env (previous
-frame); there is nothing to learn and no gradient.
-
-Flow is converted to focal-length units per second so its scale matches the templates:
-``flow_focal = flow_px / (size / 2) * tan(fov / 2) * sensory_hz``.
-"""
+"""Farneback fallback vision backend (`vision.backend: farneback`)."""
 
 from __future__ import annotations
 
@@ -19,7 +9,9 @@ import numpy as np
 
 from flybywire.vision.flowfields import CHANNELS, flow_templates, pixel_grid_focal
 
-FARNEBACK_PARAMS = dict(pyr_scale=0.5, levels=3, winsize=15, iterations=3, poly_n=5, poly_sigma=1.2, flags=0)
+FARNEBACK_PARAMS = dict(
+    pyr_scale=0.5, levels=3, winsize=15, iterations=3, poly_n=5, poly_sigma=1.2, flags=0
+)
 
 
 class FarnebackBackend:
@@ -43,7 +35,9 @@ class FarnebackBackend:
         self.templates = (t / norms).astype(np.float32)
         self.prev: list[np.ndarray | None] = []
 
-    def reset(self, batch_size: int | None = None, env_ids: Sequence[int] | None = None) -> None:
+    def reset(
+        self, batch_size: int | None = None, env_ids: Sequence[int] | None = None
+    ) -> None:
         if env_ids is None:
             self.prev = [None] * int(batch_size or len(self.prev))
         else:
@@ -67,7 +61,11 @@ class FarnebackBackend:
         for i, fr in enumerate(frames):
             cur = self._prep(fr)
             if self.prev[i] is not None:
-                flow = cv2.calcOpticalFlowFarneback(self.prev[i], cur, None, **FARNEBACK_PARAMS)
-                out[i] = self.templates @ (flow.reshape(-1).astype(np.float32) * self.scale)
+                flow = cv2.calcOpticalFlowFarneback(
+                    self.prev[i], cur, None, **FARNEBACK_PARAMS
+                )
+                out[i] = self.templates @ (
+                    flow.reshape(-1).astype(np.float32) * self.scale
+                )
             self.prev[i] = cur
         return out

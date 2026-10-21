@@ -1,9 +1,5 @@
 """Loading / validating the calibrated T4/T5 preferred-direction map.
 
-``data/flyvis/direction_map.json`` is written by ``scripts/calibrate_t4t5_directions.py``.
-Directions are unit vectors in image coordinates (x right, y down), measured with drifting
-gratings presented through the same BoxEye used everywhere else.
-
 Schema::
 
     {
@@ -30,10 +26,14 @@ def default_direction_map_path(cfg=None) -> Path:
     return setup_flyvis_env() / "direction_map.json"
 
 
-def load_direction_map(path: str | Path | None = None, cell_types=DEFAULT_CELL_TYPES) -> dict:
+def load_direction_map(
+    path: str | Path | None = None, cell_types=DEFAULT_CELL_TYPES
+) -> dict:
     path = Path(path) if path else default_direction_map_path()
     if not path.exists():
-        raise FileNotFoundError(f"{path} not found; run `make calibrate` (scripts/calibrate_t4t5_directions.py)")
+        raise FileNotFoundError(
+            f"{path} not found; run `make calibrate` (scripts/calibrate_t4t5_directions.py)"
+        )
     data = json.loads(path.read_text())
     missing = [t for t in cell_types if t not in data.get("subtypes", {})]
     if missing:
@@ -43,7 +43,9 @@ def load_direction_map(path: str | Path | None = None, cell_types=DEFAULT_CELL_T
 
 def direction_vectors(data: dict, cell_types=DEFAULT_CELL_TYPES) -> np.ndarray:
     """(8, 2) unit preferred-direction vectors in image coordinates."""
-    e = np.array([data["subtypes"][t]["direction"] for t in cell_types], dtype=np.float64)
+    e = np.array(
+        [data["subtypes"][t]["direction"] for t in cell_types], dtype=np.float64
+    )
     norms = np.linalg.norm(e, axis=1, keepdims=True)
     if np.any(norms < 1e-8):
         raise ValueError("degenerate (zero) preferred direction in direction map")
@@ -68,15 +70,7 @@ def measure_directions(
     discard_seconds: float = 0.5,
     central_radius: float = 0.6,
 ) -> dict:
-    """Measure each T4/T5 subtype's preferred image direction with drifting square-wave gratings.
-
-    Gratings drift in ``n_directions`` evenly spaced directions from 0 deg (+x, with +y down); the
-    default 12 includes the four cardinal directions. For each (period_px, temporal_hz) condition
-    all directions run as one batch from the grey steady state; ``relu(v)`` is averaged over central
-    hexals (normalised radius < ``central_radius``) and over time after ``discard_seconds``, then
-    over conditions. Preferred direction is the angle of ``z = sum_theta R(theta) exp(i theta)`` and
-    ``dsi = |z| / sum_theta R(theta)`` (docs/DECISIONS.md D23).
-    """
+    """Measure each T4/T5 subtype's preferred image direction with drifting square-wave gratings."""
     import torch
 
     from flybywire.vision.flowfields import hexal_normalized_coords
@@ -86,16 +80,30 @@ def measure_directions(
     n_skip = int(round(discard_seconds * frame_hz))
     angles = np.arange(n_directions) * 2 * np.pi / n_directions
     xy = hexal_normalized_coords(eye.extent, eye.kernel_size)
-    central = torch.as_tensor(np.linalg.norm(xy, axis=1) < central_radius, device=stepper.device)
+    central = torch.as_tensor(
+        np.linalg.norm(xy, axis=1) < central_radius, device=stepper.device
+    )
     R = np.zeros((n_directions, len(cell_types)))
     for period, tf in conditions:
-        frames = np.stack([grating_sequence(frame_size, period, tf, n_frames, frame_hz, float(a)) for a in angles])
+        frames = np.stack(
+            [
+                grating_sequence(frame_size, period, tf, n_frames, frame_hz, float(a))
+                for a in angles
+            ]
+        )
         x = torch.from_numpy(frames).to(eye.device)
         hexals = torch.stack([eye(x[:, t]) for t in range(n_frames)], dim=1)
         out = stepper.run_sequence(hexals)
-        R += torch.relu(out[:, n_skip:][..., central]).mean(dim=(1, 3)).cpu().numpy() / len(conditions)
+        R += torch.relu(out[:, n_skip:][..., central]).mean(
+            dim=(1, 3)
+        ).cpu().numpy() / len(conditions)
     stepper.reset(1)
-    grey = torch.relu(stepper.state[:, stepper._out_index][..., central]).mean(dim=(0, 2)).cpu().numpy()
+    grey = (
+        torch.relu(stepper.state[:, stepper._out_index][..., central])
+        .mean(dim=(0, 2))
+        .cpu()
+        .numpy()
+    )
     vec = (R * np.exp(1j * angles)[:, None]).sum(axis=0)
     cardinal = {"+x": 0.0, "+y": 90.0, "-x": 180.0, "-y": 270.0}
     deg = np.round(np.degrees(angles), 6)
@@ -107,8 +115,14 @@ def measure_directions(
             "direction": [float(np.real(d)), float(np.imag(d))],
             "angle_deg": float(np.degrees(np.angle(vec[i]))),
             "dsi": float(norm / R[:, i].sum()) if R[:, i].sum() > 0 else 0.0,
-            "responses": {k: float(R[np.flatnonzero(deg == a)[0], i]) for k, a in cardinal.items() if a in deg},
-            "tuning_curve": {f"{a:g}": float(r) for a, r in zip(deg, R[:, i], strict=True)},
+            "responses": {
+                k: float(R[np.flatnonzero(deg == a)[0], i])
+                for k, a in cardinal.items()
+                if a in deg
+            },
+            "tuning_curve": {
+                f"{a:g}": float(r) for a, r in zip(deg, R[:, i], strict=True)
+            },
         }
     return {
         "model": getattr(stepper, "model_id", None),

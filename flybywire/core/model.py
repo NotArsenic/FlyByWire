@@ -1,13 +1,4 @@
-"""Model wiring at multiple rates.
-
-    T4/T5 (B, 8, 721) --LPTCPool--> s (B, 8) --InputProjection--> u (B, N), ER only
-        --CentralComplex (one step per sensory tick, 100 Hz)--> r (B, N)
-        --HeadingDecoder (EPG, every core step) / Actor (PFL3, decision steps, 25 Hz) / Critic (r.detach())
-
-With the Farneback backend (``lptc=None``) the input is already ``(B, 8)``.
-Decision timing comes from :class:`flybywire.clocks.Clocks`: a decision is read out after core
-step ``t`` iff ``clocks.is_decision_step(t)`` (global step index).
-"""
+"""Model wiring at multiple rates."""
 
 from __future__ import annotations
 
@@ -20,7 +11,13 @@ from torch import nn
 
 from flybywire.clocks import Clocks, clocks_from_cfg
 from flybywire.connectome.celltypes import Connectome
-from flybywire.core.heads import Actor, AnatomicalHeadingDecoder, Critic, HeadingDecoder, InputProjection
+from flybywire.core.heads import (
+    Actor,
+    AnatomicalHeadingDecoder,
+    Critic,
+    HeadingDecoder,
+    InputProjection,
+)
 from flybywire.core.lesion import keep_mask
 from flybywire.core.population import CentralComplex
 
@@ -52,7 +49,11 @@ class FlyByWireModel(nn.Module):
         self.clocks = clocks
         self.groups = {k: np.asarray(v) for k, v in conn.groups.items()}
         self.lesion_groups = tuple(lesion_groups)
-        self.group_roles = {"input": input_group, "heading": heading_group, "actor": actor_group}
+        self.group_roles = {
+            "input": input_group,
+            "heading": heading_group,
+            "actor": actor_group,
+        }
         self.n = conn.n
         self.lptc = lptc
         self.inproj = InputProjection(n_channels, conn.n, self.groups[input_group])
@@ -68,13 +69,17 @@ class FlyByWireModel(nn.Module):
         if eb_angles is None:
             self.heading = HeadingDecoder(self.groups[heading_group])
         else:
-            self.heading = AnatomicalHeadingDecoder(self.groups[heading_group], *eb_angles)
+            self.heading = AnatomicalHeadingDecoder(
+                self.groups[heading_group], *eb_angles
+            )
         self.actor = Actor(self.groups[actor_group], n_actions, log_std_init)
         self.critic = Critic(conn.n)
 
     def lesion(self, names: Iterable[str]) -> None:
         """Silence the given cell-type groups (rates exactly 0) until :meth:`restore`."""
-        self.core.keep.copy_(keep_mask(self.n, self.groups, names).to(self.core.keep.device))
+        self.core.keep.copy_(
+            keep_mask(self.n, self.groups, names).to(self.core.keep.device)
+        )
 
     def restore(self) -> None:
         self.core.keep.fill_(1.0)
@@ -85,11 +90,15 @@ class FlyByWireModel(nn.Module):
     def sensory(self, x: torch.Tensor) -> torch.Tensor:
         return self.lptc(x) if self.lptc is not None else x.float()
 
-    def core_step(self, v: torch.Tensor, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def core_step(
+        self, v: torch.Tensor, x: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         u = self.inproj(self.sensory(x))
         return self.core(v, u)
 
-    def run(self, x_seq: torch.Tensor, v0: torch.Tensor, t0: int = 0) -> dict[str, torch.Tensor]:
+    def run(
+        self, x_seq: torch.Tensor, v0: torch.Tensor, t0: int = 0
+    ) -> dict[str, torch.Tensor]:
         """Run the core over a window of T sensory ticks starting at global core step t0."""
         b, t = x_seq.shape[:2]
         s = self.sensory(x_seq)
@@ -101,7 +110,9 @@ class FlyByWireModel(nn.Module):
             rs.append(r)
         r = torch.stack(rs, dim=1)
         dec = torch.tensor(
-            [i for i in range(t) if self.clocks.is_decision_step(t0 + i)], dtype=torch.long, device=r.device
+            [i for i in range(t) if self.clocks.is_decision_step(t0 + i)],
+            dtype=torch.long,
+            device=r.device,
         )
         return {
             "v": v,
@@ -113,7 +124,12 @@ class FlyByWireModel(nn.Module):
         }
 
 
-def build_model(cfg, conn: Connectome | None = None, lptc: nn.Module | None = None, verbose: bool = True):
+def build_model(
+    cfg,
+    conn: Connectome | None = None,
+    lptc: nn.Module | None = None,
+    verbose: bool = True,
+):
     """Build the model from config. Loads the connectome / LPTC templates unless given."""
     from flybywire.connectome.masks import build_connectome, load_eb_angles
 

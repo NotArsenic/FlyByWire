@@ -1,13 +1,4 @@
-"""Repo paths and safe flyvis import.
-
-flyvis has two import-time side effects we neutralise (docs/DECISIONS.md D11, D12):
-
-1. It resolves ``FLYVIS_ROOT_DIR`` relative to the *current working directory* (and mkdirs it).
-   :func:`setup_flyvis_env` sets an absolute path first.
-2. It calls ``torch.set_default_device("cuda")`` globally. :func:`import_flyvis` restores the
-   previous default device; flyvis calls must then run inside ``with torch.device(dev):`` because
-   flyvis allocates tensors without an explicit device.
-"""
+"""Repo paths and safe flyvis import."""
 
 from __future__ import annotations
 
@@ -21,7 +12,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def setup_flyvis_env() -> Path:
     env_file = dotenv_values(REPO_ROOT / ".env")
-    raw = os.environ.get("FLYVIS_ROOT_DIR") or env_file.get("FLYVIS_ROOT_DIR") or "./data/flyvis"
+    raw = (
+        os.environ.get("FLYVIS_ROOT_DIR")
+        or env_file.get("FLYVIS_ROOT_DIR")
+        or "./data/flyvis"
+    )
     root = Path(raw).expanduser()
     if not root.is_absolute():
         root = (REPO_ROOT / root).resolve()

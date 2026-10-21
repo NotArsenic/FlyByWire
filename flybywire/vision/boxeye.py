@@ -1,15 +1,4 @@
-"""BoxEye wrapper: grayscale frames -> hexal photoreceptor inputs.
-
-Wraps ``flyvis.datasets.rendering.eye.BoxEye`` (verified in the installed source):
-
-* receptor centres (pixels, relative to the frame centre) are ``y = d (u + v/2)``, ``x = d v`` for
-  hex coordinates ``(u, v)`` from ``flyvis.utils.hex_utils.get_hex_coords(extent)`` in that order,
-  with ``d = kernel_size``;
-* frames smaller than ``min_frame_size`` (391 x 391 for extent 15 / kernel 13) are bilinearly resized
-  up to it, box-filtered with a ``kernel_size`` mean filter, then sampled at the receptor centres.
-
-Input ``(B, H, W)`` uint8 in [0, 255] or float in [0, 1]; output ``(B, 721)`` float32 in [0, 1].
-"""
+"""BoxEye wrapper: grayscale frames -> hexal photoreceptor inputs."""
 
 from __future__ import annotations
 
@@ -20,7 +9,12 @@ from flybywire.paths import import_flyvis
 
 
 class BoxEye:
-    def __init__(self, extent: int = 15, kernel_size: int = 13, device: str | torch.device = "cpu"):
+    def __init__(
+        self,
+        extent: int = 15,
+        kernel_size: int = 13,
+        device: str | torch.device = "cpu",
+    ):
         import_flyvis()
         from flyvis.datasets.rendering.eye import BoxEye as _FlyvisBoxEye
 

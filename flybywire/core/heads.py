@@ -1,14 +1,4 @@
-"""Input projection and readout heads.
-
-* :class:`InputProjection`: (B, 8) LPTC channels -> (B, N); nonzero only on ER neurons (inv. 3).
-* :class:`HeadingDecoder`: Linear(|EPG| -> 2), (sin, cos) of heading relative to episode start.
-  Auxiliary only; never feeds the actor. Reads only EPG rates (inv. 4).
-* :class:`AnatomicalHeadingDecoder`: the same readout with fixed weights, the (sin, cos) of each
-  EPG neuron's angle around the ellipsoid body; only a scalar gain and the bias are learned.
-* :class:`Actor`: Linear(|PFL3| -> 4) + tanh mean, state-independent ``log_std`` (init -1.5).
-  Linear on purpose: "steering is a linear readout of PFL3". Reads only PFL3 rates (inv. 4).
-* :class:`Critic`: small MLP on ``r.detach()``; never backpropagates into the core (inv. 4).
-"""
+"""Input projection and readout heads."""
 
 from __future__ import annotations
 
@@ -59,7 +49,7 @@ class AnatomicalHeadingDecoder(nn.Module):
 
     def __init__(self, source_index, angle, reliable, gain_init: float = 0.1):
         super().__init__()
-        # EPG rates are O(1), so a coherent 47-neuron bump sums to ~10; 0.1 starts the output near unit length
+
         self.register_buffer("source_index", _idx(source_index))
         angle = torch.as_tensor(np.asarray(angle), dtype=torch.float32)
         keep = torch.as_tensor(np.asarray(reliable), dtype=torch.float32)
@@ -94,7 +84,11 @@ class Critic(nn.Module):
     def __init__(self, n_neurons: int, hidden: int = 64):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_neurons, hidden), nn.Tanh(), nn.Linear(hidden, hidden), nn.Tanh(), nn.Linear(hidden, 1)
+            nn.Linear(n_neurons, hidden),
+            nn.Tanh(),
+            nn.Linear(hidden, hidden),
+            nn.Tanh(),
+            nn.Linear(hidden, 1),
         )
 
     def forward(self, r: torch.Tensor) -> torch.Tensor:

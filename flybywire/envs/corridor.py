@@ -1,20 +1,4 @@
-"""Corridor flight env: gym-pybullet-drones CF2X, forward FPV camera, velocity + yaw-rate actions.
-
-The corridor runs along world +x (x in [0, length], |y| < width / 2, z in [0, height]) with
-floor-to-ceiling cylinders and boxes. The drone starts at x = START_X facing +x, so yaw_0 is the
-corridor axis.
-
-Actions in [-1, 1]^4 map to [v_forward, v_lateral, v_vertical, yaw_rate] (action.limits) and are
-tracked by DSLPIDControl every physics step. reset() runs the hover pre-roll and step(a) holds a
-for one decision; both return 4 frames (4, H, W) uint8, timed as in flybywire/clocks.py.
-
-info arrays have one row per frame: pos, quat, vel, ang_vel (world frame), yaw, rel_yaw,
-yaw_rate (body z, rad/s) and physics_step. reset() also returns obstacles, rows of
-(kind, x, y, half_x, half_y) with kind 0 = cylinder, 1 = box.
-
-The progress reward is speed along the axis in m/s rather than distance per decision, which keeps
-it on the same scale as the heading term.
-"""
+"""Corridor flight env: gym-pybullet-drones CF2X, forward FPV camera, velocity + yaw-rate actions."""
 
 from __future__ import annotations
 
@@ -150,7 +134,13 @@ class _Aviary(BaseAviary):
 class CorridorEnv(gym.Env):
     metadata = {"render_modes": ["rgb_array"], "render_fps": 100}
 
-    def __init__(self, cfg, seed: int | None = None, render_mode: str | None = None, gui: bool = False):
+    def __init__(
+        self,
+        cfg,
+        seed: int | None = None,
+        render_mode: str | None = None,
+        gui: bool = False,
+    ):
         e = cfg.env
         self.clocks = clocks_from_cfg(cfg)
         self.size = int(e.frame_size)
@@ -171,9 +161,13 @@ class CorridorEnv(gym.Env):
         self.render_mode = render_mode
         self._texture_dir = data_dir(cfg) / "textures"
 
-        self.observation_space = spaces.Box(0, 255, (self.clocks.sensory_per_decision, self.size, self.size), np.uint8)
+        self.observation_space = spaces.Box(
+            0, 255, (self.clocks.sensory_per_decision, self.size, self.size), np.uint8
+        )
         self.action_space = spaces.Box(-1.0, 1.0, (4,), np.float32)
-        self.hover_action = normalize_action(np.zeros(4), self.limits).astype(np.float32)
+        self.hover_action = normalize_action(np.zeros(4), self.limits).astype(
+            np.float32
+        )
 
         self.obstacles = np.zeros((0, 5))
         # BaseAviary prints its URDF parameters every time
@@ -184,7 +178,9 @@ class CorridorEnv(gym.Env):
         self._drone = int(self._aviary.DRONE_IDS[0])
         self.renderer, self._renderer_flag = self._pick_renderer(str(e.renderer), gui)
         log.info("CorridorEnv renderer: %s", self.renderer)
-        self._proj = p.computeProjectionMatrixFOV(self.fov, 1.0, NEAR, FAR, physicsClientId=self._cid)
+        self._proj = p.computeProjectionMatrixFOV(
+            self.fov, 1.0, NEAR, FAR, physicsClientId=self._cid
+        )
         self._last_frame = np.zeros((self.size, self.size), np.uint8)
         if seed is not None:
             self.np_random, _ = seeding.np_random(seed)
@@ -194,11 +190,19 @@ class CorridorEnv(gym.Env):
             return "gui", p.ER_BULLET_HARDWARE_OPENGL
         if choice in ("auto", "egl"):
             spec = importlib.util.find_spec("eglRenderer")
-            plugin = p.loadPlugin(spec.origin, "_eglRendererPlugin", physicsClientId=self._cid) if spec else -1
+            plugin = (
+                p.loadPlugin(
+                    spec.origin, "_eglRendererPlugin", physicsClientId=self._cid
+                )
+                if spec
+                else -1
+            )
             if plugin >= 0:
                 return "egl", p.ER_BULLET_HARDWARE_OPENGL
             if choice == "egl":
-                raise RuntimeError("env.renderer=egl but the pybullet EGL plugin did not load")
+                raise RuntimeError(
+                    "env.renderer=egl but the pybullet EGL plugin did not load"
+                )
         return "tiny", p.ER_TINY_RENDERER
 
     def _sample_layout(self) -> np.ndarray:
@@ -207,12 +211,16 @@ class CorridorEnv(gym.Env):
         if self.pair_prob > 0:
             return self._sample_rows()
         if self.spacing is None:
-            xs = np.linspace(FIRST_OBSTACLE_X, self.length - 2.0, n) + rng.uniform(-0.5, 0.5, n)
+            xs = np.linspace(FIRST_OBSTACLE_X, self.length - 2.0, n) + rng.uniform(
+                -0.5, 0.5, n
+            )
         else:
-            # dense stage (D44): fixed spacing from the first obstacle on, jitter small enough that
-            # neighbours never overlap along x
-            xs = FIRST_OBSTACLE_X + self.spacing * (np.arange(n) + rng.uniform(-0.15, 0.15, n))
-        rows = [self._pillar(x, rng.uniform(-OBSTACLE_Y_MAX, OBSTACLE_Y_MAX)) for x in xs]
+            xs = FIRST_OBSTACLE_X + self.spacing * (
+                np.arange(n) + rng.uniform(-0.15, 0.15, n)
+            )
+        rows = [
+            self._pillar(x, rng.uniform(-OBSTACLE_Y_MAX, OBSTACLE_Y_MAX)) for x in xs
+        ]
         return np.array(rows, dtype=float).reshape(n, 5)
 
     def _pillar(self, x: float, y: float) -> tuple:
@@ -224,8 +232,7 @@ class CorridorEnv(gym.Env):
         return (1, x, y, hx, hy)
 
     def _sample_rows(self) -> np.ndarray:
-        # forest level (D46): a row every `spacing` m holding one pillar or, with probability
-        # pair_prob, two side by side anywhere across the corridor, as long as one gap stays open
+
         rng = self.np_random
         half = self.width / 2
         rows, k = [], 0
@@ -233,11 +240,18 @@ class CorridorEnv(gym.Env):
             x = FIRST_OBSTACLE_X + self.spacing * (k + rng.uniform(-0.15, 0.15))
             k += 1
             if self.n_obstacles - len(rows) < 2 or rng.random() >= self.pair_prob:
-                rows.append(self._pillar(x, rng.uniform(-OBSTACLE_Y_MAX, OBSTACLE_Y_MAX)))
+                rows.append(
+                    self._pillar(x, rng.uniform(-OBSTACLE_Y_MAX, OBSTACLE_Y_MAX))
+                )
                 continue
             while True:
-                pair = sorted((self._pillar(x, rng.uniform(-half + 0.2, half - 0.2)) for _ in range(2)),
-                              key=lambda r: r[2])
+                pair = sorted(
+                    (
+                        self._pillar(x, rng.uniform(-half + 0.2, half - 0.2))
+                        for _ in range(2)
+                    ),
+                    key=lambda r: r[2],
+                )
                 (_, _, ya, _, ha), (_, _, yb, _, hb) = pair
                 gaps = (ya - ha + half, (yb - hb) - (ya + ha), half - (yb + hb))
                 if gaps[1] > 0 and max(gaps) >= MIN_GAP:
@@ -251,36 +265,60 @@ class CorridorEnv(gym.Env):
 
     def _box(self, cid, center, half, gray, texture):
         col = p.createCollisionShape(p.GEOM_BOX, halfExtents=half, physicsClientId=cid)
-        vis = p.createVisualShape(p.GEOM_BOX, halfExtents=half, rgbaColor=[gray, gray, gray, 1], physicsClientId=cid)
+        vis = p.createVisualShape(
+            p.GEOM_BOX,
+            halfExtents=half,
+            rgbaColor=[gray, gray, gray, 1],
+            physicsClientId=cid,
+        )
         self._body(cid, col, vis, center, texture)
 
     def _build_corridor(self, cid) -> None:
         L, W, H = self.length, self.width, self.height
         t = 0.05
-        # OpenGL puts a fine default checker on primitives that aliases at a distance, so every
-        # body gets an explicit texture
-        plain = p.loadTexture(_texture_file("plain", self._texture_dir), physicsClientId=cid)
+
+        plain = p.loadTexture(
+            _texture_file("plain", self._texture_dir), physicsClientId=cid
+        )
         wall_tex, wall_gray = plain, 0.75
         if self.texture != "none":
-            wall_tex = p.loadTexture(_texture_file(self.texture, self._texture_dir), physicsClientId=cid)
+            wall_tex = p.loadTexture(
+                _texture_file(self.texture, self._texture_dir), physicsClientId=cid
+            )
             wall_gray = 1.0
         n_seg = int(np.ceil(L / WALL_SEGMENT))
         seg = L / n_seg
         for side in (-1, 1):
             for i in range(n_seg):
-                self._box(cid, [(i + 0.5) * seg, side * (W / 2 + t), H / 2], [seg / 2, t, H / 2], wall_gray, wall_tex)
+                self._box(
+                    cid,
+                    [(i + 0.5) * seg, side * (W / 2 + t), H / 2],
+                    [seg / 2, t, H / 2],
+                    wall_gray,
+                    wall_tex,
+                )
         self._box(cid, [L / 2, 0, H + t], [L / 2, W / 2 + 2 * t, t], 0.55, plain)
         for x in (-t, L + t):
             self._box(cid, [x, 0, H / 2], [t, W / 2 + 2 * t, H / 2], 0.4, plain)
         cyl_gray, box_gray, obstacle_tex = 0.25, 0.35, plain
         if self.obstacle_texture != "none":
-            obstacle_tex = p.loadTexture(_texture_file(self.obstacle_texture, self._texture_dir), physicsClientId=cid)
+            obstacle_tex = p.loadTexture(
+                _texture_file(self.obstacle_texture, self._texture_dir),
+                physicsClientId=cid,
+            )
             cyl_gray = box_gray = TEXTURED_OBSTACLE_GRAY
         for kind, x, y, hx, hy in self.obstacles:
             if kind == 0:
-                col = p.createCollisionShape(p.GEOM_CYLINDER, radius=hx, height=H, physicsClientId=cid)
-                vis = p.createVisualShape(p.GEOM_CYLINDER, radius=hx, length=H, rgbaColor=[cyl_gray] * 3 + [1],
-                                          physicsClientId=cid)
+                col = p.createCollisionShape(
+                    p.GEOM_CYLINDER, radius=hx, height=H, physicsClientId=cid
+                )
+                vis = p.createVisualShape(
+                    p.GEOM_CYLINDER,
+                    radius=hx,
+                    length=H,
+                    rgbaColor=[cyl_gray] * 3 + [1],
+                    physicsClientId=cid,
+                )
                 self._body(cid, col, vis, [x, y, H / 2], obstacle_tex)
             else:
                 self._box(cid, [x, y, H / 2], [hx, hy, H / 2], box_gray, obstacle_tex)
@@ -304,7 +342,7 @@ class CorridorEnv(gym.Env):
         dt = self.clocks.dt_physics
         pos, quat, rpy, vel = av.pos[0], av.quat[0], av.rpy[0], av.vel[0]
         self._target_yaw = float(wrap(self._target_yaw + cmd[3] * dt))
-        # the controller's yaw D term differences against the last step, which jumps 2 pi at +/-pi
+
         last = self._ctrl.last_rpy
         last[2] += 2 * np.pi * np.round((rpy[2] - last[2]) / (2 * np.pi))
         rpm, _, _ = self._ctrl.computeControl(
@@ -357,7 +395,9 @@ class CorridorEnv(gym.Env):
         rng = self.np_random
         self.obstacles = self._sample_layout()
         av = self._aviary
-        av.INIT_XYZS = np.array([[START_X, rng.uniform(-0.3, 0.3), rng.uniform(1.0, 1.4)]])
+        av.INIT_XYZS = np.array(
+            [[START_X, rng.uniform(-0.3, 0.3), rng.uniform(1.0, 1.4)]]
+        )
         av.INIT_RPYS = np.zeros((1, 3))
         av.reset()
         self._drone = int(av.DRONE_IDS[0])
@@ -381,7 +421,11 @@ class CorridorEnv(gym.Env):
         info = self._info(states)
         pos, rpy = states[-1]["pos"], states[-1]["rpy"]
         out_of_bounds = (
-            pos[0] < 0 or pos[0] > self.length or abs(pos[1]) > self.width / 2 or pos[2] < 0 or pos[2] > self.height
+            pos[0] < 0
+            or pos[0] > self.length
+            or abs(pos[1]) > self.width / 2
+            or pos[2] < 0
+            or pos[2] > self.height
         )
         reached_end = pos[0] >= self.length - END_MARGIN
         w = self.weights
@@ -407,8 +451,13 @@ class CorridorEnv(gym.Env):
         eye = av.pos[0] + rot @ np.array([CAMERA_OFFSET, 0.0, 0.0])
         view = p.computeViewMatrix(eye, eye + forward, up, physicsClientId=self._cid)
         _, _, rgba, _, _ = p.getCameraImage(
-            self.size, self.size, view, self._proj,
-            shadow=0, renderer=self._renderer_flag, flags=p.ER_NO_SEGMENTATION_MASK,
+            self.size,
+            self.size,
+            view,
+            self._proj,
+            shadow=0,
+            renderer=self._renderer_flag,
+            flags=p.ER_NO_SEGMENTATION_MASK,
             physicsClientId=self._cid,
         )
         rgb = np.asarray(rgba, dtype=np.uint8).reshape(self.size, self.size, 4)[..., :3]

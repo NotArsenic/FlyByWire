@@ -1,11 +1,4 @@
-"""Corridor envs in worker processes for PPO rollouts.
-
-Workers only render and step physics; BoxEye, flyvis and the core run batched in the main
-process. With SAME_STEP autoreset (D20) the step that ends an episode already returns the next
-episode's frames, plus info["final_obs"] / info["final_info"], so the main process has to reset
-that env's core and flyvis state before using them. Workers are spawned, not forked, so they
-don't inherit the main process's CUDA context.
-"""
+"""Corridor envs in worker processes for PPO rollouts."""
 
 from __future__ import annotations
 

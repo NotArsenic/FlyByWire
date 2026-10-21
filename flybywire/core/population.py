@@ -1,16 +1,4 @@
-"""CentralComplex: one recurrent rate population masked by the connectome.
-
-    r_t     = phi(v_t) * keep                  # keep: (N,) 0/1 lesion mask
-    drive_t = r_t @ (W * M) + u_t + b          # M[i, j] = 1 iff pre i -> post j
-    v_{t+1} = (1 - alpha) * v_t + alpha * drive_t
-    alpha   = sigmoid(a)                       # per neuron; optionally sigmoid(a + c * u_t)
-
-The ONLY neuron-to-neuron path is ``r @ (W * M)`` (invariant 1): no residual stream, no
-LayerNorm, no attention, no dense layer over the neuron axis. The optional input-dependent
-alpha uses an elementwise gain ``c * u_t`` (per neuron, its own input only) so it adds no
-cross-neuron interaction. ``W`` is a dense (N, N) parameter times a registered bool buffer ``M``;
-gradients w.r.t. ``W`` are exactly zero off-mask (invariant 2). fp32 only.
-"""
+"""CentralComplex: one recurrent rate population masked by the connectome."""
 
 from __future__ import annotations
 
@@ -51,7 +39,9 @@ class CentralComplex(nn.Module):
         mean_in_degree = max(float(M.sum()) / n, 1.0)
         std = w_init_gain / math.sqrt(mean_in_degree)
         W = torch.randn(n, n, generator=generator) * std
-        self.W = nn.Parameter(W * M)  # off-mask entries start at 0 and never receive gradient
+        self.W = nn.Parameter(
+            W * M
+        )  # off-mask entries start at 0 and never receive gradient
         self.b = nn.Parameter(torch.zeros(n))
         self.a = nn.Parameter(torch.full((n,), math.log(alpha_init / (1 - alpha_init))))
         if input_dependent_alpha:
@@ -83,9 +73,13 @@ class CentralComplex(nn.Module):
         return self.phi(v) * self.keep
 
     def init_state(self, batch_size: int, device=None) -> torch.Tensor:
-        return torch.zeros(batch_size, self.n, device=device if device is not None else self.W.device)
+        return torch.zeros(
+            batch_size, self.n, device=device if device is not None else self.W.device
+        )
 
-    def forward(self, v: torch.Tensor, u: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, v: torch.Tensor, u: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         r = self.rates(v)
         drive = r @ self.effective_weight() + u + self.b
         alpha = self.alpha(u)

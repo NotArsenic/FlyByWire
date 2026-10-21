@@ -1,13 +1,4 @@
-"""Do EPG neurons form a heading ring that matches their anatomical angle around the EB?
-
-Two angles per EPG neuron are compared: the anatomical one (centroid of its EB arbor, from
-``scripts/epg_anatomy.py``) and the preferred heading found in the trained network, either from
-the rates (least squares of rate on ``[1, sin h, cos h]``) or from the heading-decoder weights.
-
-The anatomical frame has an arbitrary zero and handedness, so scores are invariant to rotation
-and reflection and use label-shuffle permutation tests. Tuning fits are kept as per-episode
-moments so a bootstrap over episodes is a cheap resampling of sums.
-"""
+"""Topography and circular statistics."""
 
 from __future__ import annotations
 
@@ -30,11 +21,8 @@ def circ_corr(a, b) -> float:
 
 
 def alignment(phi, theta) -> tuple[float, int, float]:
-    """Best match of phi to theta up to rotation and reflection.
+    """Best match of phi to theta up to rotation and reflection."""
 
-    Returns (score, sign, offset): score = max over s in {+1, -1} of |mean exp(i (phi - s theta))|,
-    and phi is roughly ``sign * theta + offset``.
-    """
     best = (-1.0, 1, 0.0)
     for s in (1, -1):
         z = np.exp(1j * (np.asarray(phi) - s * np.asarray(theta))).mean()
@@ -52,11 +40,7 @@ def abs_circ_corr(a, b) -> float:
 
 
 def harmonic_r2(y, theta) -> float:
-    """R^2 of y on [1, cos theta, sin theta].
-
-    Invariant to rotation and reflection of theta, so it asks "does y vary as a sinusoid of the
-    anatomical angle" without needing the zero or the handedness.
-    """
+    """R^2 of y on [1, cos theta, sin theta]."""
     y = np.asarray(y, dtype=float)
     x = np.stack([np.ones_like(y), np.cos(theta), np.sin(theta)], axis=1)
     beta, *_ = np.linalg.lstsq(x, y, rcond=None)
@@ -69,20 +53,25 @@ def permutation_test(stat, phi, theta, n_perm: int = 10000, seed: int = 0) -> di
     rng = np.random.default_rng(seed)
     obs = stat(phi, theta)
     null = np.array([stat(phi, rng.permutation(theta)) for _ in range(n_perm)])
-    return {"value": float(obs), "p": float((1 + (null >= obs).sum()) / (1 + n_perm)),
-            "null_mean": float(null.mean()), "null_95": float(np.quantile(null, 0.95))}
+    return {
+        "value": float(obs),
+        "p": float((1 + (null >= obs).sum()) / (1 + n_perm)),
+        "null_mean": float(null.mean()),
+        "null_95": float(np.quantile(null, 0.95)),
+    }
 
 
 def episode_moments(rate, heading) -> dict:
-    """Sums for the least-squares fit rate ~ 1 + sin h + cos h on one episode.
-
-    rate: (T, n) rates, heading: (T,) radians. Float64 because sin and cos are nearly collinear
-    with the intercept when headings are small.
-    """
+    """Sums for the least-squares fit rate ~ 1 + sin h + cos h on one episode."""
     rate = np.asarray(rate, dtype=np.float64)
     h = np.asarray(heading, dtype=np.float64)
     x = np.stack([np.ones_like(h), np.sin(h), np.cos(h)], axis=1)
-    return {"xtx": x.T @ x, "xty": x.T @ rate, "yty": (rate**2).sum(0), "n": float(len(h))}
+    return {
+        "xtx": x.T @ x,
+        "xty": x.T @ rate,
+        "yty": (rate**2).sum(0),
+        "n": float(len(h)),
+    }
 
 
 def stack_moments(moments: list[dict]) -> dict:
@@ -90,13 +79,12 @@ def stack_moments(moments: list[dict]) -> dict:
 
 
 def fit_tuning(stacked: dict, weights=None) -> dict:
-    """Per-neuron fit from stacked per-episode moments.
-
-    ``weights`` (episodes,) are bootstrap counts; default is every episode once. phi is the
-    preferred heading, amplitude / mean the relative tuning strength, slope the coefficient on
-    sin h in units of the neuron's rate sd (the part of the tuning small headings can pin down).
-    """
-    w = np.ones(len(stacked["n"])) if weights is None else np.asarray(weights, dtype=np.float64)
+    """Per-neuron fit from stacked per-episode moments."""
+    w = (
+        np.ones(len(stacked["n"]))
+        if weights is None
+        else np.asarray(weights, dtype=np.float64)
+    )
     xtx = np.einsum("e,eij->ij", w, stacked["xtx"])
     xty = np.einsum("e,ein->in", w, stacked["xty"])
     yty = w @ stacked["yty"]
@@ -129,11 +117,16 @@ def decoder_angle(weight):
     return np.arctan2(w[0], w[1])
 
 
-def bootstrap_tuning(stacked: dict, n_boot: int = 500, seed: int = 0) -> dict[str, np.ndarray]:
+def bootstrap_tuning(
+    stacked: dict, n_boot: int = 500, seed: int = 0
+) -> dict[str, np.ndarray]:
     """Resample episodes with replacement; returns each fit field stacked over draws."""
     rng = np.random.default_rng(seed)
     e = len(stacked["n"])
-    draws = [fit_tuning(stacked, np.bincount(rng.integers(0, e, e), minlength=e)) for _ in range(n_boot)]
+    draws = [
+        fit_tuning(stacked, np.bincount(rng.integers(0, e, e), minlength=e))
+        for _ in range(n_boot)
+    ]
     return {k: np.stack([d[k] for d in draws]) for k in draws[0]}
 
 
@@ -152,7 +145,9 @@ def expected_alignment(theta, sd, n_draws: int = 1000, seed: int = 0) -> np.ndar
     Shows what a perfect ring would score given how noisy the phi estimates are.
     """
     rng = np.random.default_rng(seed)
-    return np.array([alignment_score(theta + rng.normal(0, sd), theta) for _ in range(n_draws)])
+    return np.array(
+        [alignment_score(theta + rng.normal(0, sd), theta) for _ in range(n_draws)]
+    )
 
 
 def phi_spread(phi_hat, phi_boot) -> np.ndarray:
@@ -161,13 +156,7 @@ def phi_spread(phi_hat, phi_boot) -> np.ndarray:
 
 
 def ring_frame(points, center):
-    """Frame of the ring plane fitted by PCA. Returns (axes (3, 3), sd (2,)).
-
-    axes rows are lateral (toward +x), dorsal (toward -y, projected into the plane) and the
-    normal (smallest-variance PCA axis). The in-plane axes come from the anatomy rather than the
-    PCA because a nearly round ring has no stable principal axes in its plane. sd is the spread
-    of the points along lateral and dorsal.
-    """
+    """Frame of the ring plane fitted by PCA. Returns (axes (3, 3), sd (2,))."""
     d = np.asarray(points) - center
     normal = np.linalg.svd(d, full_matrices=False)[2][2]
     dorsal = np.array([0.0, -1.0, 0.0])

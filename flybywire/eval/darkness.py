@@ -1,10 +1,4 @@
-"""Does the heading code outlast the motion input? After Seelig and Jayaraman (2015).
-
-The core runs on cached T4/T5 up to t0. From there the input is the flyvis grey steady-state
-T4/T5 (no motion) and the core keeps stepping. The network never saw this during training, so
-whatever persistence shows up is not something it was asked to do. The same branch with the
-recurrent weights zeroed is the reference for a network that only decays.
-"""
+"""Evaluate the persistence of heading information in the presence of dark stimuli."""
 
 from __future__ import annotations
 
@@ -54,23 +48,29 @@ def _stepper(cfg, device, steady_state_seconds=None):
         device=device,
         dt=clocks_from_cfg(cfg).dt_sensory,
         cell_types=tuple(cfg.vision.cell_types),
-        steady_state_seconds=float(steady_state_seconds or cfg.vision.steady_state_seconds),
+        steady_state_seconds=float(
+            steady_state_seconds or cfg.vision.steady_state_seconds
+        ),
     )
 
 
 def grey_t4t5(cfg, device, steady_state_seconds=None) -> torch.Tensor:
-    """(8, 721) T4/T5 activity of the flyvis grey steady state (``vision.steady_state_seconds`` unless given)."""
+    """(8, 721) T4/T5 activity of the flyvis grey steady state (vision.steady_state_seconds unless given)."""
     stepper = _stepper(cfg, device, steady_state_seconds)
     return stepper.readout(stepper.steady_state(1))[0].half().float()
 
 
-def static_t4t5(cfg, device, hexals, seconds: float = 1.5, chunk: int = 100) -> np.ndarray:
-    """(n, 8, 721) T4/T5 activity after each frame of hexals (n, 721) is held still for ``seconds``, from grey."""
+def static_t4t5(
+    cfg, device, hexals, seconds: float = 1.5, chunk: int = 100
+) -> np.ndarray:
+    """(n, 8, 721) T4/T5 activity after each frame of hexals (n, 721) is held still for seconds, from grey."""
     stepper = _stepper(cfg, device)
     n_steps = int(round(seconds / stepper.dt))
     out = []
     for i in range(0, len(hexals), chunk):
-        x = torch.as_tensor(np.asarray(hexals[i : i + chunk]), dtype=torch.float32, device=device)
+        x = torch.as_tensor(
+            np.asarray(hexals[i : i + chunk]), dtype=torch.float32, device=device
+        )
         stepper.reset(len(x))
         for _ in range(n_steps):
             t4t5 = stepper.step(x)
@@ -107,7 +107,9 @@ def pause_branch(model, v, r, s_seq, n_steps: int) -> torch.Tensor:
     return torch.stack(rs, dim=1)
 
 
-def dark_branch(model, v, r, blank, n_steps: int, recurrent: bool = True) -> torch.Tensor:
+def dark_branch(
+    model, v, r, blank, n_steps: int, recurrent: bool = True
+) -> torch.Tensor:
     """hold_branch on the LPTC channels of the T4/T5 pattern ``blank`` (8, 721)."""
     with torch.no_grad():
         s = model.sensory(blank[None])[0]
@@ -115,12 +117,7 @@ def dark_branch(model, v, r, blank, n_steps: int, recurrent: bool = True) -> tor
 
 
 def dark_series(model, r: torch.Tensor, layout: RingLayout) -> dict[str, np.ndarray]:
-    """Per-sample time series, each (B, n_steps + 1), from rates r (B, n_steps + 1, N).
-
-    ``heading_drift`` and ``ring_drift`` are the change in the decoded heading and in the ring
-    bump angle since step 0 (rad); ``decoder_size`` is the length of the decoder output without
-    its bias; ``ring_size`` and ``ring_fraction`` are the bump length and first-harmonic share.
-    """
+    """Per-sample time series, each (B, n_steps + 1), from rates r (B, n_steps + 1, N)."""
     with torch.no_grad():
         head = model.heading(r)
         dec = head - model.heading.bias
@@ -138,31 +135,26 @@ def dark_series(model, r: torch.Tensor, layout: RingLayout) -> dict[str, np.ndar
 
 
 def dark_stats(series: dict, steps, ref: dict | None = None) -> dict[str, list[float]]:
-    """Statistics over samples at each step in ``steps`` after t0.
-
-    Drifts are |angle change| in degrees. ``*_retention`` is the mean size over the mean size at
-    step 0 of ``ref`` (default: the same series).
-    """
+    """Statistics over samples at each step in ``steps`` after t0."""
     ref = ref or series
     out = {}
     for name in ("heading_drift", "ring_drift"):
         d = np.degrees(np.abs(series[name][:, steps]))
         out[f"{name}_deg_mean"] = d.mean(0)
         out[f"{name}_deg_median"] = np.median(d, 0)
-        out[f"{name}_deg_q25"], out[f"{name}_deg_q75"] = np.quantile(d, [0.25, 0.75], axis=0)
+        out[f"{name}_deg_q25"], out[f"{name}_deg_q75"] = np.quantile(
+            d, [0.25, 0.75], axis=0
+        )
     for name in ("decoder", "ring"):
-        out[f"{name}_retention"] = series[f"{name}_size"][:, steps].mean(0) / ref[f"{name}_size"][:, 0].mean()
+        out[f"{name}_retention"] = (
+            series[f"{name}_size"][:, steps].mean(0) / ref[f"{name}_size"][:, 0].mean()
+        )
     out["ring_fraction"] = series["ring_fraction"][:, steps].mean(0)
     return {k: np.asarray(v).tolist() for k, v in out.items()}
 
 
 def signed_stats(drift, episode, n_boot: int = 2000, seed: int = 0) -> dict[str, float]:
-    """Which way the drift goes. ``drift``: signed drift per trial (deg); ``episode``: episode id per trial.
-
-    Trials from one episode share a scene and are strongly correlated, so the sign test and the
-    bootstrap interval work on episodes, not trials. ``mean_over_mean_abs`` is 1 in magnitude when
-    every trial goes the same way and near 0 when the signs cancel.
-    """
+    """Which way the drift goes. ``drift``: signed drift per trial (deg); ``episode``: episode id per trial."""
     d = np.asarray(drift, dtype=np.float64)
     ep = np.unique(episode, return_inverse=True)[1]
     total, count = np.bincount(ep, weights=d), np.bincount(ep)
@@ -181,7 +173,9 @@ def signed_stats(drift, episode, n_boot: int = 2000, seed: int = 0) -> dict[str,
         "frac_negative": float((d < 0).mean()),
         "episodes_negative": n_neg,
         "episodes_positive": n_pos,
-        "sign_test_p": float(binomtest(n_neg, n_neg + n_pos).pvalue) if n_neg + n_pos else 1.0,
+        "sign_test_p": (
+            float(binomtest(n_neg, n_neg + n_pos).pvalue) if n_neg + n_pos else 1.0
+        ),
     }
 
 
@@ -190,7 +184,9 @@ def yaw_calibration(s_yaw, angle, yaw_rate, skip=100, win=25, dt=0.01):
     starts = np.arange(skip, s_yaw.shape[1] - win, win)
     chan = np.stack([s_yaw[:, a : a + win].mean(1) for a in starts], 1).ravel()
     true = np.stack([yaw_rate[:, a : a + win].mean(1) for a in starts], 1).ravel()
-    dec = np.stack([wrap(angle[:, a + win] - angle[:, a]) for a in starts], 1).ravel() / (win * dt)
+    dec = np.stack(
+        [wrap(angle[:, a + win] - angle[:, a]) for a in starts], 1
+    ).ravel() / (win * dt)
     ok = np.abs(dec) < 6
     out = {}
     for name, rate, keep in (("decoded", dec, ok), ("true", true, np.ones_like(ok))):
@@ -224,6 +220,10 @@ def velocity_field(drift_1s, start, width=20.0, min_n=15):
     adjacent = np.diff(c) <= width * 1.01
     cross = (np.sign(v[:-1]) != np.sign(v[1:])) & adjacent
     at = c[:-1] + (c[1:] - c[:-1]) * v[:-1] / (v[:-1] - v[1:] + 1e-12)
-    return {"centre_deg": centre, "median_drift_1s_deg": median, "n": n,
-            "stable_deg": at[cross & (v[:-1] > v[1:])].round(1).tolist(),
-            "unstable_deg": at[cross & (v[:-1] < v[1:])].round(1).tolist()}
+    return {
+        "centre_deg": centre,
+        "median_drift_1s_deg": median,
+        "n": n,
+        "stable_deg": at[cross & (v[:-1] > v[1:])].round(1).tolist(),
+        "unstable_deg": at[cross & (v[:-1] < v[1:])].round(1).tolist(),
+    }

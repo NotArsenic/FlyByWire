@@ -1,15 +1,4 @@
-"""Live view of PPO training in one window: a chase camera on env 0's drone, what its eye sees,
-the corridor from above, the EPG ring and the training curves.
-
-The window runs in its own process and gets small messages through a queue. Training never waits
-for it: when the queue is full a message is dropped, so a slow or closed window costs nothing.
-The chase camera is a copy of env 0, not env 0 itself: the window's process rebuilds env 0's
-corridor in its own pybullet client and puts the drone where env 0 reports it. (Opening the
-training env in a pybullet GUI tied it to that window: closing the window killed the run, D43.)
-
-``record(path)`` saves the window as a video for env 0's next full episode. Frames go straight to
-the encoder, so a recording costs no memory; ``room_to_record`` keeps the videos within a disk budget.
-"""
+"""Live view of PPO training in one window: a chase camera on env 0's drone, what its eye sees, the corridor from above, the EPG ring and the training curves."""
 
 from __future__ import annotations
 
@@ -38,9 +27,18 @@ class Watcher:
         self.layout = layout
         self.epg = np.asarray(epg_index)
         cfg_dict = OmegaConf.to_container(cfg, resolve=True) if chase else None
-        self.proc = ctx.Process(target=run_window, args=(self.q, layout.n_wedges, layout.label, cfg_dict,
-                                                         float(cfg.env.corridor.length_m),
-                                                         float(cfg.env.corridor.width_m)), daemon=True)
+        self.proc = ctx.Process(
+            target=run_window,
+            args=(
+                self.q,
+                layout.n_wedges,
+                layout.label,
+                cfg_dict,
+                float(cfg.env.corridor.length_m),
+                float(cfg.env.corridor.width_m),
+            ),
+            daemon=True,
+        )
         self.proc.start()
 
     def _put(self, msg) -> None:
@@ -52,7 +50,15 @@ class Watcher:
     def step(self, frame, r, heading, rel_yaw) -> None:
         ring = ring_activity(r.detach().cpu().numpy()[self.epg], self.layout)
         h = heading.detach().cpu().numpy()
-        self._put(("step", np.asarray(frame), ring, float(np.arctan2(h[0], h[1])), float(rel_yaw)))
+        self._put(
+            (
+                "step",
+                np.asarray(frame),
+                ring,
+                float(np.arctan2(h[0], h[1])),
+                float(rel_yaw),
+            )
+        )
 
     def position(self, pos, quat) -> None:
         self._put(("pos", np.asarray(pos, dtype=float), np.asarray(quat, dtype=float)))
@@ -61,11 +67,19 @@ class Watcher:
         self._put(("episode", np.asarray(obstacles, dtype=float)))
 
     def update(self, stats: dict) -> None:
-        keys = ("update", "success_100", "return_100", "kl_bc", "aux_heading", "value_loss", "warmup")
+        keys = (
+            "update",
+            "success_100",
+            "return_100",
+            "kl_bc",
+            "aux_heading",
+            "value_loss",
+            "warmup",
+        )
         self._put(("update", {k: stats.get(k) for k in keys}))
 
     def record(self, path, title: str) -> None:
-        # blocking put: a dropped request would silently lose the recording
+
         self.q.put(("record", str(path), title))
 
     def close(self) -> None:
@@ -99,7 +113,9 @@ class Mirror:
 
         self.pos = pos
         self.yaw = p.getEulerFromQuaternion(quat)[2]
-        p.resetBasePositionAndOrientation(self.env._drone, pos, quat, physicsClientId=self.env._cid)
+        p.resetBasePositionAndOrientation(
+            self.env._drone, pos, quat, physicsClientId=self.env._cid
+        )
 
     def image(self) -> np.ndarray:
         from flybywire.eval.live import chase_image
@@ -107,15 +123,31 @@ class Mirror:
         return chase_image(self.env._cid, self.pos, self.yaw, 480, 300)
 
 
-def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, length: float, width: float) -> None:
+def run_window(
+    q,
+    n_wedges: int,
+    layout_label: str,
+    cfg_dict: dict | None,
+    length: float,
+    width: float,
+) -> None:
     import matplotlib.pyplot as plt
     from matplotlib.patches import Circle, Rectangle
 
     mirror = Mirror(cfg_dict) if cfg_dict is not None else None
     plt.ion()
     fig = plt.figure("Fly-By-Wire PPO", figsize=(16, 8.4))
-    grid = fig.add_gridspec(2, 4, height_ratios=[1.25, 1], left=0.02, right=0.98, top=0.93, bottom=0.06,
-                            wspace=0.15, hspace=0.25)
+    grid = fig.add_gridspec(
+        2,
+        4,
+        height_ratios=[1.25, 1],
+        left=0.02,
+        right=0.98,
+        top=0.93,
+        bottom=0.06,
+        wspace=0.15,
+        hspace=0.25,
+    )
     ax_chase = fig.add_subplot(grid[0, :2])
     ax_eye = fig.add_subplot(grid[0, 2])
     ax_ring = fig.add_subplot(grid[0, 3], projection="polar")
@@ -132,17 +164,19 @@ def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, lengt
     ax_eye.axis("off")
 
     theta = (np.arange(n_wedges) + 0.5) * 2 * np.pi / n_wedges
-    bars = ax_ring.bar(theta, np.zeros(n_wedges), width=2 * np.pi / n_wedges * 0.9, bottom=0.2)
-    true_line, = ax_ring.plot([0, 0], [0, 1.2], "r-", lw=2, label="true heading")
-    dec_line, = ax_ring.plot([0, 0], [0, 1.2], "c--", lw=2, label="decoded")
+    bars = ax_ring.bar(
+        theta, np.zeros(n_wedges), width=2 * np.pi / n_wedges * 0.9, bottom=0.2
+    )
+    (true_line,) = ax_ring.plot([0, 0], [0, 1.2], "r-", lw=2, label="true heading")
+    (dec_line,) = ax_ring.plot([0, 0], [0, 1.2], "c--", lw=2, label="decoded")
     ax_ring.set_yticks([])
     ax_ring.set_xticks([])
     ax_ring.set_title(f"EPG ring ({layout_label})", fontsize=8)
     ax_ring.legend(loc="lower center", fontsize=7, bbox_to_anchor=(0.5, -0.25), ncol=2)
 
     trail_x, trail_y, obstacle_patches = [], [], []
-    trail, = ax_map.plot([], [], "b-", lw=1)
-    drone, = ax_map.plot([], [], "bo", ms=5)
+    (trail,) = ax_map.plot([], [], "b-", lw=1)
+    (drone,) = ax_map.plot([], [], "bo", ms=5)
     ax_map.set_xlim(0, length)
     ax_map.set_ylim(-width / 2, width / 2)
     ax_map.set_aspect("equal")
@@ -192,8 +226,13 @@ def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, lengt
                     finish_recording()
                     recording, writer = armed, None
                     if armed is not None:
-                        writer = imageio.get_writer(armed[0], fps=25, codec="libx264", quality=7,
-                                                    macro_block_size=8)
+                        writer = imageio.get_writer(
+                            armed[0],
+                            fps=25,
+                            codec="libx264",
+                            quality=7,
+                            macro_block_size=8,
+                        )
                         armed = None
                     trail_x.clear()
                     trail_y.clear()
@@ -201,7 +240,11 @@ def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, lengt
                         patch.remove()
                     obstacle_patches.clear()
                     for k, x, y, hx, hy in msg[1]:
-                        patch = Circle((x, y), hx) if k == 0 else Rectangle((x - hx, y - hy), 2 * hx, 2 * hy)
+                        patch = (
+                            Circle((x, y), hx)
+                            if k == 0
+                            else Rectangle((x - hx, y - hy), 2 * hx, 2 * hy)
+                        )
                         patch.set_color("0.4")
                         obstacle_patches.append(ax_map.add_patch(patch))
                     if mirror is not None:
@@ -231,10 +274,15 @@ def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, lengt
                     ax_succ.axvspan(min(warm), max(warm), color="0.9")
                 ax_loss.clear()
                 ax_loss.plot(u, [s["kl_bc"] or 0 for s in stats], label="KL to BC")
-                ax_loss.plot(u, [s["aux_heading"] or 0 for s in stats], label="heading loss")
+                ax_loss.plot(
+                    u, [s["aux_heading"] or 0 for s in stats], label="heading loss"
+                )
                 ax_loss.legend(fontsize=7)
                 ax_loss.set_xlabel("update")
-                title.set_text(f"PPO update {u[-1]}" + (f"   (recording: {recording[1]})" if recording else ""))
+                title.set_text(
+                    f"PPO update {u[-1]}"
+                    + (f"   (recording: {recording[1]})" if recording else "")
+                )
             if recording is not None:
                 fig.canvas.draw()
                 writer.append_data(np.asarray(fig.canvas.buffer_rgba())[..., :3])
@@ -248,5 +296,7 @@ def run_window(q, n_wedges: int, layout_label: str, cfg_dict: dict | None, lengt
         else:
             from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-            FigureCanvasAgg(fig)  # the window was closed: keep drawing off-screen for recordings
+            FigureCanvasAgg(
+                fig
+            )  # the window was closed: keep drawing off-screen for recordings
             closed = True

@@ -1,19 +1,4 @@
-"""Expert trajectory files ``data/expert/traj_XXXXX.npz``.
-
-Layout (``T = 4 * T_dec`` core steps at 100 Hz, ``T_dec`` decisions at 25 Hz; see clocks.py)::
-
-    hexals    (T, 721)  float16   BoxEye output of frame t (what flyvis consumes)
-    actions   (T_dec, 4) float32  normalised [-1, 1] expert action for decision k
-    rel_yaw   (T,)      float32   wrap(yaw_t - yaw_0) at frame t
-    yaw_rate  (T,)      float32   body yaw rate at frame t (rad/s)
-    pos (T, 3), quat (T, 4), vel (T, 3), ang_vel (T, 3), yaw (T,)   float32 privileged state
-    yaw_0     ()        float32
-    collided  ()        bool
-    meta      ()        str       JSON: seed, texture, config hash, ...
-
-State arrays are sampled at frame times (``Clocks.frame_time``). Only ``hexals``, ``actions``,
-``rel_yaw`` and ``yaw_rate`` are required; state arrays are optional (synthetic smoke data).
-"""
+"""Expert trajectory files ``data/expert/traj_XXXXX.npz``."""
 
 from __future__ import annotations
 
@@ -107,7 +92,11 @@ class Trajectory:
             if missing:
                 raise ValueError(f"{path} is missing {missing}")
             return cls(
-                hexals=z["hexals"] if load_hexals else np.empty((len(z["rel_yaw"]), 0), np.float16),
+                hexals=(
+                    z["hexals"]
+                    if load_hexals
+                    else np.empty((len(z["rel_yaw"]), 0), np.float16)
+                ),
                 actions=z["actions"],
                 rel_yaw=z["rel_yaw"],
                 yaw_rate=z["yaw_rate"],

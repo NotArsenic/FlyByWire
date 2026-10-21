@@ -29,7 +29,16 @@ ENUMS = {
     "action.space": {"body_vel_yawrate"},
     "logging.wandb_mode": {"online", "offline", "disabled"},
 }
-LPTC_CHANNELS = ["yaw", "pitch", "roll", "forward", "lateral", "vertical", "loom_left", "loom_right"]
+LPTC_CHANNELS = [
+    "yaw",
+    "pitch",
+    "roll",
+    "forward",
+    "lateral",
+    "vertical",
+    "loom_left",
+    "loom_right",
+]
 ACTION_KEYS = ["v_forward", "v_lateral", "v_vertical", "yaw_rate"]
 
 
@@ -38,7 +47,9 @@ class ConfigError(ValueError):
 
 
 def load_config(
-    path: str | os.PathLike | None = None, overrides: Sequence[str] | None = None, validate: bool = True
+    path: str | os.PathLike | None = None,
+    overrides: Sequence[str] | None = None,
+    validate: bool = True,
 ) -> DictConfig:
     load_dotenv(REPO_ROOT / ".env", override=False)
     cfg = OmegaConf.load(Path(path) if path else DEFAULT_CONFIG)
@@ -65,7 +76,9 @@ def validate_config(cfg: DictConfig) -> Clocks:
             errors.append(f"{key}={v!r} not in {sorted(allowed)}")
 
     if obstacle_texture(cfg) not in TEXTURES:
-        errors.append(f"env.obstacle_texture={obstacle_texture(cfg)!r} not in {sorted(TEXTURES)}")
+        errors.append(
+            f"env.obstacle_texture={obstacle_texture(cfg)!r} not in {sorted(TEXTURES)}"
+        )
 
     clocks = None
     try:
@@ -79,7 +92,9 @@ def validate_config(cfg: DictConfig) -> Clocks:
             errors.append(f"env.episode_seconds: {e}")
         tb = int(cfg.bc.tbptt_core_steps)
         if tb <= 0 or tb % clocks.sensory_per_decision:
-            errors.append(f"bc.tbptt_core_steps={tb} must be a positive multiple of {clocks.sensory_per_decision}")
+            errors.append(
+                f"bc.tbptt_core_steps={tb} must be a positive multiple of {clocks.sensory_per_decision}"
+            )
 
     if list(cfg.lptc.channels) != LPTC_CHANNELS:
         errors.append(f"lptc.channels must be exactly {LPTC_CHANNELS}")
@@ -92,10 +107,14 @@ def validate_config(cfg: DictConfig) -> Clocks:
     for role in ("input_group", "heading_group", "actor_group"):
         g = cfg.connectome[role]
         if g not in groups:
-            errors.append(f"connectome.{role}={g!r} is not a defined group ({list(groups)})")
+            errors.append(
+                f"connectome.{role}={g!r} is not a defined group ({list(groups)})"
+            )
     for g in cfg.connectome.lesion_groups:
         if g not in groups:
-            errors.append(f"connectome.lesion_groups entry {g!r} is not a defined group")
+            errors.append(
+                f"connectome.lesion_groups entry {g!r} is not a defined group"
+            )
     if int(cfg.connectome.min_synapses) < 1:
         errors.append("connectome.min_synapses must be >= 1")
 
@@ -137,7 +156,9 @@ def config_hash(cfg: DictConfig, keys: Sequence[str] | None = None) -> str:
         sub = {}
         for k in keys:
             v = OmegaConf.select(cfg, k)
-            sub[k] = OmegaConf.to_container(v, resolve=True) if OmegaConf.is_config(v) else v
+            sub[k] = (
+                OmegaConf.to_container(v, resolve=True) if OmegaConf.is_config(v) else v
+            )
     blob = OmegaConf.to_yaml(OmegaConf.create(sub), sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()[:12]
 

@@ -1,8 +1,4 @@
-"""Mask conditions: ``real``, ``rewire`` (directed degree-preserving) and ``er`` (Erdos-Renyi).
-
-All conditions share the same N, neuron order and cell-type index sets; only the edges differ
-(invariant 7).
-"""
+"""FlyWire connectome, mask conditions and directed rewiring."""
 
 from __future__ import annotations
 
@@ -19,7 +15,9 @@ log = logging.getLogger(__name__)
 MASK_TYPES = ("real", "rewire", "er")
 
 
-def apply_mask_type(conn: Connectome, mask_type: str, seed: int = 0, swaps_per_edge: float = 10.0) -> Connectome:
+def apply_mask_type(
+    conn: Connectome, mask_type: str, seed: int = 0, swaps_per_edge: float = 10.0
+) -> Connectome:
     if mask_type == "real":
         return conn.with_mask(conn.M.copy(), mask_type="real")
     if mask_type == "rewire":
@@ -32,10 +30,18 @@ def apply_mask_type(conn: Connectome, mask_type: str, seed: int = 0, swaps_per_e
             100 * stats.surviving_fraction,
         )
         if stats.swaps_done < stats.swaps_target:
-            log.warning("rewire: only %d of %d target swaps succeeded", stats.swaps_done, stats.swaps_target)
-        return conn.with_mask(M, mask_type="rewire", rewire_stats=stats.__dict__, rewire_seed=seed)
+            log.warning(
+                "rewire: only %d of %d target swaps succeeded",
+                stats.swaps_done,
+                stats.swaps_target,
+            )
+        return conn.with_mask(
+            M, mask_type="rewire", rewire_stats=stats.__dict__, rewire_seed=seed
+        )
     if mask_type == "er":
-        return conn.with_mask(erdos_renyi_like(conn.M, seed=seed), mask_type="er", er_seed=seed)
+        return conn.with_mask(
+            erdos_renyi_like(conn.M, seed=seed), mask_type="er", er_seed=seed
+        )
     raise ValueError(f"unknown mask_type {mask_type!r}; expected one of {MASK_TYPES}")
 
 
@@ -52,7 +58,9 @@ def load_base_connectome(cfg) -> Connectome:
     conn = Connectome.load(path)
     missing = [g for g in cfg.connectome.groups if g not in conn.groups]
     if missing:
-        raise ValueError(f"{path} lacks groups {missing}; re-run the loader with the current config")
+        raise ValueError(
+            f"{path} lacks groups {missing}; re-run the loader with the current config"
+        )
     return conn
 
 
@@ -65,19 +73,20 @@ def eb_angles_path(cfg) -> Path:
 def load_eb_angles(cfg, conn: Connectome, path=None) -> tuple[np.ndarray, np.ndarray]:
     """(angle_rad, reliable) per heading-group neuron, in the model's order (from scripts/epg_anatomy.py)."""
     z = np.load(path or eb_angles_path(cfg))
-    if not np.array_equal(z["neuron_ids"], conn.neuron_ids[conn.groups[cfg.connectome.heading_group]]):
+    if not np.array_equal(
+        z["neuron_ids"], conn.neuron_ids[conn.groups[cfg.connectome.heading_group]]
+    ):
         raise ValueError("EB angles are not in the model's EPG order")
     return z["angle_rad"], z["reliable"]
 
 
 def build_connectome(cfg, seed: int | None = None) -> Connectome:
-    """Base graph with the configured mask type applied.
-
-    ``seed`` (default ``cfg.seed``) seeds the rewire / ER null model, so each training seed gets
-    its own null graph.
-    """
+    """Base graph with the configured mask type applied."""
     conn = load_base_connectome(cfg)
     seed = int(cfg.seed if seed is None else seed)
     return apply_mask_type(
-        conn, cfg.connectome.mask_type, seed=seed, swaps_per_edge=float(cfg.connectome.rewire_swaps_per_edge)
+        conn,
+        cfg.connectome.mask_type,
+        seed=seed,
+        swaps_per_edge=float(cfg.connectome.rewire_swaps_per_edge),
     )

@@ -1,15 +1,4 @@
-"""FlyWire central-complex loader (Codex snapshot 783, manual download).
-
-Reads the connections table and the cell-type annotation table from ``data/flywire/raw/``,
-keeps neurons whose type matches the configured group patterns, sums synapse counts per
-(pre, post) pair across neuropils, drops pairs below ``min_synapses`` and self-connections, and
-writes ``data/flywire/processed/cx_graph.npz`` (see :class:`~flybywire.connectome.celltypes.Connectome`).
-
-File and column names come from ``connectome.flywire`` in the config. On a schema mismatch the
-loader prints the columns it found and exits.
-
-Usage: ``python -m flybywire.connectome.flywire [override=value ...]``
-"""
+"""FlyWire central-complex loader (Codex snapshot 783, manual download)."""
 
 from __future__ import annotations
 
@@ -48,7 +37,10 @@ def _read_table(path: Path, needed: dict[str, str], what: str) -> pd.DataFrame:
         print(f"\nSchema mismatch in {what} table {path}:", file=sys.stderr)
         print(f"  expected columns (config key -> name): {missing}", file=sys.stderr)
         print(f"  columns actually found: {list(header)}", file=sys.stderr)
-        print("  Fix connectome.flywire.columns in the config and re-run.", file=sys.stderr)
+        print(
+            "  Fix connectome.flywire.columns in the config and re-run.",
+            file=sys.stderr,
+        )
         raise SchemaError(2)
     usecols = sorted(set(needed.values()))
     if ".parquet" in suffixes:
@@ -63,17 +55,25 @@ def load_flywire_cx(cfg, raw_dir: Path, verbose: bool = True) -> Connectome:
     cols = fw.columns
     patterns = {g: list(p) for g, p in cfg.connectome.groups.items()}
 
-    ann = _read_table(raw_dir / fw.annotations_file, {"id": cols.id, "type": cols.type}, "annotation")
+    ann = _read_table(
+        raw_dir / fw.annotations_file, {"id": cols.id, "type": cols.type}, "annotation"
+    )
     ann = ann.dropna(subset=[cols.type]).drop_duplicates(subset=[cols.id])
     ann[cols.type] = ann[cols.type].astype(str)
     groups_all = match_groups(ann[cols.type].tolist(), patterns)
-    keep_rows = np.concatenate([v for v in groups_all.values()]) if groups_all else np.array([], int)
+    keep_rows = (
+        np.concatenate([v for v in groups_all.values()])
+        if groups_all
+        else np.array([], int)
+    )
     if len(keep_rows) == 0:
-        print("No neurons matched the configured group patterns. Types present (sample):", file=sys.stderr)
+        print(
+            "No neurons matched the configured group patterns. Types present (sample):",
+            file=sys.stderr,
+        )
         print(sorted(ann[cols.type].unique())[:200], file=sys.stderr)
         raise SchemaError(2)
 
-    # deterministic order: config group order, then type, then id
     group_of_row = {}
     for g, rows in groups_all.items():
         for r in rows:
@@ -90,11 +90,23 @@ def load_flywire_cx(cfg, raw_dir: Path, verbose: bool = True) -> Connectome:
     if fw.get("names_file"):
         names_path = raw_dir / fw.names_file
         if names_path.exists():
-            names = _read_table(names_path, {"id": cols.name_id, "name": cols.name}, "names")
-            name_map = dict(zip(names[cols.name_id].to_numpy(np.int64), names[cols.name].astype(str), strict=True))
-            instances = np.asarray([name_map.get(int(i), t) for i, t in zip(ids, types, strict=True)])
+            names = _read_table(
+                names_path, {"id": cols.name_id, "name": cols.name}, "names"
+            )
+            name_map = dict(
+                zip(
+                    names[cols.name_id].to_numpy(np.int64),
+                    names[cols.name].astype(str),
+                    strict=True,
+                )
+            )
+            instances = np.asarray(
+                [name_map.get(int(i), t) for i, t in zip(ids, types, strict=True)]
+            )
         elif verbose:
-            print(f"(names table {names_path} not found; ring layout will fall back to 'tuning')")
+            print(
+                f"(names table {names_path} not found; ring layout will fall back to 'tuning')"
+            )
 
     # sum over neuropils before thresholding, so min_synapses applies to the whole pair
     needed = {"pre": cols.pre, "post": cols.post, "syn_count": cols.syn_count}
@@ -102,7 +114,10 @@ def load_flywire_cx(cfg, raw_dir: Path, verbose: bool = True) -> Connectome:
     idset = pd.Index(ids)
     con = con[con[cols.pre].isin(idset) & con[cols.post].isin(idset)]
     con = con.groupby([cols.pre, cols.post], as_index=False)[cols.syn_count].sum()
-    con = con[(con[cols.syn_count] >= int(cfg.connectome.min_synapses)) & (con[cols.pre] != con[cols.post])]
+    con = con[
+        (con[cols.syn_count] >= int(cfg.connectome.min_synapses))
+        & (con[cols.pre] != con[cols.post])
+    ]
     pos = pd.Series(np.arange(len(ids)), index=ids)
     i = pos.loc[con[cols.pre].to_numpy(np.int64)].to_numpy()
     j = pos.loc[con[cols.post].to_numpy(np.int64)].to_numpy()
@@ -116,7 +131,10 @@ def load_flywire_cx(cfg, raw_dir: Path, verbose: bool = True) -> Connectome:
         instances=instances,
         groups=groups,
         source="flywire",
-        meta={"snapshot": int(fw.snapshot), "min_synapses": int(cfg.connectome.min_synapses)},
+        meta={
+            "snapshot": int(fw.snapshot),
+            "min_synapses": int(cfg.connectome.min_synapses),
+        },
     )
     if verbose:
         print("\nMatched cell types:")
@@ -128,7 +146,9 @@ def load_flywire_cx(cfg, raw_dir: Path, verbose: bool = True) -> Connectome:
         print(f"\nN = {conn.n}   edges = {conn.n_edges}   density = {conn.density:.4f}")
         empty = [g for g, idx in groups.items() if len(idx) == 0]
         if empty:
-            print(f"WARNING: groups with no neurons: {empty}; check the patterns against the annotation table")
+            print(
+                f"WARNING: groups with no neurons: {empty}; check the patterns against the annotation table"
+            )
     return conn
 
 

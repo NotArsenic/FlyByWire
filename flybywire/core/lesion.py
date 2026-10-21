@@ -1,8 +1,4 @@
-"""Lesion helpers: silence cell-type groups by zeroing their rates (``keep = 0``).
-
-A lesioned neuron's rate is exactly 0 at every step (invariant 6), so it influences nothing
-downstream through ``r @ (W * M)`` or any head. Lesions can be toggled between any two steps.
-"""
+"""Lesion helpers: silence cell-type groups by zeroing their rates (keep = 0)."""
 
 from __future__ import annotations
 
@@ -13,18 +9,22 @@ import numpy as np
 import torch
 
 
-def keep_mask(n: int, groups: Mapping[str, np.ndarray], names: Iterable[str]) -> torch.Tensor:
+def keep_mask(
+    n: int, groups: Mapping[str, np.ndarray], names: Iterable[str]
+) -> torch.Tensor:
     keep = torch.ones(n)
     for name in names:
         if name not in groups:
-            raise KeyError(f"unknown lesion group {name!r}; available: {sorted(groups)}")
+            raise KeyError(
+                f"unknown lesion group {name!r}; available: {sorted(groups)}"
+            )
         keep[torch.as_tensor(np.asarray(groups[name]), dtype=torch.long)] = 0.0
     return keep
 
 
 @contextmanager
 def lesioned(model, names: Iterable[str]):
-    """``with lesioned(model, ["EPG"]): ...`` lesions inside the block and restores afterwards."""
+    """Context manager to temporarily lesion a model."""
     prev = model.core.keep.clone()
     model.lesion(list(names))
     try:

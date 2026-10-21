@@ -22,11 +22,20 @@ from flybywire.data.cache import T4T5Cache, build_cache
 from flybywire.data.trajectories import list_trajectories
 from flybywire.vision.flyvis_stepper import FlyvisStepper
 
-VISION_KEYS = ["clocks.sensory_hz", "vision.flyvis_model", "vision.boxeye", "vision.cell_types",
-               "vision.steady_state_seconds", "env.frame_size", "env.camera_fov_deg"]
+VISION_KEYS = [
+    "clocks.sensory_hz",
+    "vision.flyvis_model",
+    "vision.boxeye",
+    "vision.cell_types",
+    "vision.steady_state_seconds",
+    "env.frame_size",
+    "env.camera_fov_deg",
+]
 
 
-def run(cfg, traj_dirs: list[Path], out_dir: Path, batch: int, device: str | None = None) -> Path:
+def run(
+    cfg, traj_dirs: list[Path], out_dir: Path, batch: int, device: str | None = None
+) -> Path:
     paths = []
     for d in traj_dirs:
         found = list_trajectories(d)
@@ -50,20 +59,28 @@ def run(cfg, traj_dirs: list[Path], out_dir: Path, batch: int, device: str | Non
         "stepper_mode": stepper.mode,
         "config_hash": config_hash(cfg, VISION_KEYS),
     }
-    print(f"building cache from {len(paths)} trajectories in {', '.join(map(str, traj_dirs))} -> {out_dir} "
-          f"(device {device})")
+    print(
+        f"building cache from {len(paths)} trajectories in {', '.join(map(str, traj_dirs))} -> {out_dir} "
+        f"(device {device})"
+    )
     build_cache(paths, out_dir, stepper, manifest_extra=extra, batch_size=batch)
     cache = T4T5Cache(out_dir)
-    print(f"done: {len(cache)} episodes, total_T={cache.data.shape[0]}, shape={cache.data.shape}, "
-          f"{cache.data.nbytes / 1e9:.2f} GB")
+    print(
+        f"done: {len(cache)} episodes, total_T={cache.data.shape[0]}, shape={cache.data.shape}, "
+        f"{cache.data.nbytes / 1e9:.2f} GB"
+    )
     return out_dir
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--traj-dir", nargs="+", default=None)
     ap.add_argument("--out", default=None)
-    ap.add_argument("--batch", type=int, default=16, help="trajectories per flyvis batch (10-20)")
+    ap.add_argument(
+        "--batch", type=int, default=16, help="trajectories per flyvis batch (10-20)"
+    )
     ap.add_argument("--device", default=None)
     ap.add_argument("overrides", nargs="*")
     args = ap.parse_args(argv)

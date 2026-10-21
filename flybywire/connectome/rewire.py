@@ -1,13 +1,4 @@
-"""Directed, degree-preserving rewiring by repeated two-edge swaps.
-
-Pick edges ``a->b`` and ``c->d`` with four distinct endpoints; replace them with ``a->d`` and
-``c->b`` iff neither new edge already exists (and neither is a self-loop, which distinctness
-already guarantees). Every node keeps its exact in-degree and out-degree, the edge count is
-unchanged, and no self-loops or duplicate edges are introduced.
-
-``networkx.double_edge_swap`` is deliberately NOT used: it is undirected-only and would destroy
-the in/out-degree split (see docs/DECISIONS.md, D2).
-"""
+"""FlyWire connectome directed rewiring."""
 
 from __future__ import annotations
 
@@ -26,13 +17,12 @@ class RewireStats:
 
 
 def directed_rewire(
-    M: np.ndarray, swaps_per_edge: float = 10.0, seed: int = 0, max_attempts_factor: float = 100.0
+    M: np.ndarray,
+    swaps_per_edge: float = 10.0,
+    seed: int = 0,
+    max_attempts_factor: float = 100.0,
 ) -> tuple[np.ndarray, RewireStats]:
-    """Return a rewired copy of boolean adjacency ``M`` (``M[pre, post]``) and statistics.
-
-    Performs ``round(swaps_per_edge * |E|)`` successful swaps (seeded). Gives up after
-    ``max_attempts_factor * target`` attempts and reports the number actually done.
-    """
+    """Return a rewired copy of boolean adjacency ``M`` (``M[pre, post]``) and statistics."""
     M = np.asarray(M, dtype=bool)
     n = M.shape[0]
     if M.diagonal().any():

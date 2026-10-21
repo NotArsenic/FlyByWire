@@ -1,12 +1,4 @@
-"""Clock rates and timing alignment across physics, sensory, and control loops.
-
-Timeline for one episode with K decisions (defaults: 200 / 100 / 25 Hz):
-
-    physics step p :  0 1 | 2 3 | 4 5 | 6 7 || 8 9 | ...
-    frame / core t :    0 |   1 |   2 |   3 ||   4 | ...
-    decision k     :                      0 ||                 1 ...
-    action held    :  a_hover (pre-roll)    ||  a_0 for physics 8..15, ...
-"""
+"""Clock rates and timing alignment across physics, sensory, and control loops."""
 
 from __future__ import annotations
 
@@ -27,9 +19,13 @@ class Clocks:
             if not isinstance(v, int) or v <= 0:
                 raise ValueError(f"clocks.{name} must be a positive int, got {v!r}")
         if self.physics_hz % self.sensory_hz:
-            raise ValueError(f"physics_hz={self.physics_hz} not divisible by sensory_hz={self.sensory_hz}")
+            raise ValueError(
+                f"physics_hz={self.physics_hz} not divisible by sensory_hz={self.sensory_hz}"
+            )
         if self.sensory_hz % self.control_hz:
-            raise ValueError(f"sensory_hz={self.sensory_hz} not divisible by control_hz={self.control_hz}")
+            raise ValueError(
+                f"sensory_hz={self.sensory_hz} not divisible by control_hz={self.control_hz}"
+            )
 
     @property
     def physics_per_sensory(self) -> int:
@@ -58,7 +54,9 @@ class Clocks:
     def n_decisions(self, episode_seconds: float) -> int:
         k = episode_seconds * self.control_hz
         if abs(k - round(k)) > 1e-9:
-            raise ValueError(f"episode_seconds={episode_seconds} is not a whole number of decisions")
+            raise ValueError(
+                f"episode_seconds={episode_seconds} is not a whole number of decisions"
+            )
         return int(round(k))
 
     def n_core_steps(self, n_decisions: int) -> int:
@@ -93,8 +91,12 @@ class Clocks:
     def windows(self, n_core_steps: int, window: int) -> list[tuple[int, int]]:
         """Split [0, T) into consecutive TBPTT windows of length `window`."""
         if window % self.sensory_per_decision:
-            raise ValueError(f"TBPTT window {window} must be a multiple of {self.sensory_per_decision}")
-        return [(s, min(s + window, n_core_steps)) for s in range(0, n_core_steps, window)]
+            raise ValueError(
+                f"TBPTT window {window} must be a multiple of {self.sensory_per_decision}"
+            )
+        return [
+            (s, min(s + window, n_core_steps)) for s in range(0, n_core_steps, window)
+        ]
 
 
 def clocks_from_cfg(cfg) -> Clocks:
