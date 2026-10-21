@@ -48,7 +48,7 @@ def plot(path: Path, pilot: Path, runs: list[str]) -> None:
         for a, f in zip(ax, fields, strict=True):
             a.plot(f["centre_deg"], f["median_drift_1s_deg"], color="#2a78d6" if name.startswith("real") else "#eb6834",
                    ls="-" if "pause" in name else "--", marker="o", ms=3, label=name)
-    for a, title in zip(ax, ("last frame held still, switched on at once (D37)", "pause with real flyvis transient"),
+    for a, title in zip(ax, ("last frame held still, switched on at once", "pause with real flyvis transient"),
                         strict=True):
         a.axhline(0, color="#999999", lw=0.8)
         a.set_xlabel("decoded heading at the start (deg)")

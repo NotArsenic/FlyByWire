@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Heading persistence through a time-freeze pause on held-out episodes (D39).
+"""Heading persistence through a time-freeze pause on held-out episodes.
 
 The checkpoint runs on the real T4/T5 up to the start t0 of a pause-bank entry. From there the
 input is the bank's: flyvis' response to the frame at t0 held still, entry transient included.

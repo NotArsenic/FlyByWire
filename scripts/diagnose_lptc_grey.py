@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Why the LPTC channels are not zero on the flyvis grey input although D14 subtracts a grey baseline.
+"""Why the LPTC channels are not zero on the flyvis grey input although a grey baseline is subtracted.
 
 Traces the response of every checkpoint's LPTC to the grey steady state: the baseline in the
 direction map (which hexals and what state it was measured on), the grey relu(activity) by hexal

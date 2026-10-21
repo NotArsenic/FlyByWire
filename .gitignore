@@ -20,3 +20,10 @@ dist/
 
 # graphify (regenerate with `graphify update .`)
 graphify-out/
+
+# agent files
+AGENTS.md
+CLAUDE.md
+.claude/
+docs/DECISIONS.md
+docs/protocols/

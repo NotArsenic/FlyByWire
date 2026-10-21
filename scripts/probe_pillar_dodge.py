@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Can the expert's dodge around the next pillar be read from what the network sees? (D47)
+"""Can the expert's dodge around the next pillar be read from what the network sees?
 
 Decisions of cached expert episodes where the nearest obstacle row is 1.0-2.5 m ahead and the drone
 faces within 30 deg of the corridor axis. Targets: the dodge side (sign of the expert's world-frame

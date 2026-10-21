@@ -1,4 +1,4 @@
-"""At least one test per architecture invariant (numbered as in AGENTS.md)."""
+"""At least one test per architecture invariant (numbered 1-10)."""
 
 from __future__ import annotations
 

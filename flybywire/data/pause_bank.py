@@ -1,4 +1,4 @@
-"""Pause bank: T4/T5 input for synthetic pauses in which time stands still (docs/DECISIONS.md D39)."""
+"""Pause bank: T4/T5 input for synthetic pauses in which time stands still."""
 
 from __future__ import annotations
 

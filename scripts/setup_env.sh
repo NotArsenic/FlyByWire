@@ -42,7 +42,7 @@ TORCH_VER="$(python -c 'import torch; print(torch.__version__)')"
 log "3/8 flyvis"
 python -m pip install flyvis
 if ! torch_ok || [ "$(python -c 'import torch; print(torch.__version__)')" != "$TORCH_VER" ]; then
-  echo "!! flyvis dependencies replaced torch; reinstalling from $TORCH_INDEX (record in docs/DECISIONS.md)"
+  echo "!! flyvis dependencies replaced torch; reinstalling from $TORCH_INDEX"
   python -m pip install --force-reinstall --no-deps torch torchvision --index-url "$TORCH_INDEX"
   torch_ok
 fi
@@ -60,7 +60,7 @@ if [ -z "$CHANGES" ]; then
 else
   echo "!! installing gym-pybullet-drones with deps would replace:"
   echo "$CHANGES" | sed 's/^/     /'
-  echo "!! using --no-deps and installing its runtime deps explicitly (see docs/DECISIONS.md)"
+  echo "!! using --no-deps and installing its runtime deps explicitly"
   python -m pip install --no-deps "$GPD_URL"
   # runtime deps of gym_pybullet_drones (stable-baselines3 is only used by its examples)
   python -m pip install pillow transforms3d control

@@ -11,7 +11,7 @@ points here by default. On WSL, keep this on the Linux filesystem, never under `
 | `expert/` | `traj_XXXXX.npz`: `hexals (T, 721)` fp16 @ 100 Hz, `actions (T_dec, 4)` fp32 normalized, state arrays, `rel_yaw (T,)`, `yaw_rate (T,)`, `collided`, metadata | `scripts/collect_expert.py` (`make collect`) |
 | `frames/` | raw frames for at most 20 episodes (debugging and video only) | `scripts/collect_expert.py --save-frames` |
 | `cache/` | `t4t5_fp16.npy` memmap `(total_T, 8, 721)`, `offsets.npy`, `manifest.json` | `scripts/build_cache.py` (`make cache`) |
-| `pause_bank_*/` | `bank_fp16.npy` memmap `(rows, 8, 721)`, `entries.npz`, `manifest.json`: T4/T5 of held frames plus real recovery, bound to one cache (D39) | `scripts/build_pause_bank.py` |
+| `pause_bank_*/` | `bank_fp16.npy` memmap `(rows, 8, 721)`, `entries.npz`, `manifest.json`: T4/T5 of held frames plus real recovery, bound to one cache | `scripts/build_pause_bank.py` |
 | `textures/` | wall texture PNGs for `env.wall_texture` | written by the corridor env on first use |
-| `flywire/skeletons/` | `sk_lod1_783_healed_ds2.parquet`, skeletons of all release-783 neurons (Zenodo 10877326, CC BY 4.0; D28) | manual download |
+| `flywire/skeletons/` | `sk_lod1_783_healed_ds2.parquet`, skeletons of all release-783 neurons (Zenodo 10877326, CC BY 4.0) | manual download |
 | `smoke/` | synthetic trajectories + cache for `make smoke` (plumbing only, not a result) | `scripts/smoke_end_to_end.py` |
