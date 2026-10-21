@@ -68,9 +68,18 @@ def real_pass(model, data, t0s, chunk):
         s.append(out["s"].numpy())
         angle.append(np.arctan2(h[..., 0], h[..., 1]))
         yaw_rate.append(
-            np.stack([Trajectory.load(data.cache.trajectories[i], load_hexals=False).yaw_rate for i in idx])
+            np.stack(
+                [
+                    Trajectory.load(
+                        data.cache.trajectories[i], load_hexals=False
+                    ).yaw_rate
+                    for i in idx
+                ]
+            )
         )
-        rel_yaw.append(torch.atan2(batch["heading"][..., 0], batch["heading"][..., 1]).numpy())
+        rel_yaw.append(
+            torch.atan2(batch["heading"][..., 0], batch["heading"][..., 1]).numpy()
+        )
         for t0, (v, r) in snapshots(model, x, t0s).items():
             states[t0][0].append(v)
             states[t0][1].append(r)
@@ -113,7 +122,10 @@ def summarise(branch, start_true, episode, subsets, steps_at):
         k = steps_at[SECONDS[-1]]
         for label, start in (("decoded", start_decoded), ("true", start_true)):
             slope, icpt = np.polyfit(np.degrees(wrap(start[keep])), drift[keep, k], 1)
-            per[f"vs_{label}_start_heading_2s"] = {"slope_deg_per_deg": float(slope), "intercept_deg": float(icpt)}
+            per[f"vs_{label}_start_heading_2s"] = {
+                "slope_deg_per_deg": float(slope),
+                "intercept_deg": float(icpt),
+            }
         out[name] = per
     return out
 
@@ -125,13 +137,23 @@ def swap_table(branches, s_grey, s_static, steps_at, keep):
     rows = {}
     for i, ch in enumerate(CHANNELS):
         d_ch = float(s_grey[i] - s_static[:, i].mean())
-        add = {f"{sec:g}s": mean(f"static+grey_{ch}", k) - mean("static", k) for sec, k in ((0.5, k5), (2.0, k20))}
-        rem = {f"{sec:g}s": mean("grey", k) - mean(f"grey+static_{ch}", k) for sec, k in ((0.5, k5), (2.0, k20))}
+        add = {
+            f"{sec:g}s": mean(f"static+grey_{ch}", k) - mean("static", k)
+            for sec, k in ((0.5, k5), (2.0, k20))
+        }
+        rem = {
+            f"{sec:g}s": mean("grey", k) - mean(f"grey+static_{ch}", k)
+            for sec, k in ((0.5, k5), (2.0, k20))
+        }
         rows[ch] = {
             "grey_minus_static": round(d_ch, 3),
             "drift_deg_adding_grey_channel_to_static": add,
             "drift_deg_removing_offset_from_grey": rem,
-            "dc_gain_rad_s_per_unit": float(np.radians(add["0.5s"]) / 0.5 / d_ch) if abs(d_ch) > 1e-6 else None,
+            "dc_gain_rad_s_per_unit": (
+                float(np.radians(add["0.5s"]) / 0.5 / d_ch)
+                if abs(d_ch) > 1e-6
+                else None
+            ),
         }
     return rows
 
@@ -157,17 +179,31 @@ def diagnose(ckpt, data, grey, frames, args):
         to_grey = s_static.clone()
         to_grey[..., i] = s_grey[i]
         inputs[f"grey+static_{ch}"], inputs[f"static+grey_{ch}"] = to_static, to_grey
-    branches = {name: branch_drift(model, states, t0s, c, n_steps, sel) for name, c in inputs.items()}
-    scaled = {lam: branch_drift(model, states, t0s, s_static, n_steps, sel, lam) for lam in SCALES}
+    branches = {
+        name: branch_drift(model, states, t0s, c, n_steps, sel)
+        for name, c in inputs.items()
+    }
+    scaled = {
+        lam: branch_drift(model, states, t0s, s_static, n_steps, sel, lam)
+        for lam in SCALES
+    }
 
     episode = np.tile(np.arange(n_ep), n_t0)
     start_true = np.concatenate([rel_yaw[:, t0 - 1] for t0 in t0s])
-    still = np.concatenate([np.abs(yaw_rate[:, t0 - 50 : t0]).mean(1) < args.still_rate for t0 in t0s])
-    off_axis = np.concatenate([np.abs(rel_yaw[:, t0 - 1]) > np.deg2rad(45) for t0 in t0s])
+    still = np.concatenate(
+        [np.abs(yaw_rate[:, t0 - 50 : t0]).mean(1) < args.still_rate for t0 in t0s]
+    )
+    off_axis = np.concatenate(
+        [np.abs(rel_yaw[:, t0 - 1]) > np.deg2rad(45) for t0 in t0s]
+    )
     subsets = {"all": np.ones(len(episode), bool), "still_off_axis": still & off_axis}
-    drift = {name: summarise(branches[name], start_true, episode, subsets, steps_at) for name in ("grey", "static")}
+    drift = {
+        name: summarise(branches[name], start_true, episode, subsets, steps_at)
+        for name in ("grey", "static")
+    }
     fields = {
-        name: velocity_field(branches[name][0][:, steps_at[1.0]], branches[name][2]) for name in ("grey", "static")
+        name: velocity_field(branches[name][0][:, steps_at[1.0]], branches[name][2])
+        for name in ("grey", "static")
     }
     scaled_stats = {}
     for lam, b in scaled.items():
@@ -182,7 +218,11 @@ def diagnose(ckpt, data, grey, frames, args):
     yaw = s_grey[0].item()
     naive = {
         f"{sec:g}s": {
-            fit: float(np.degrees(c["gain_rad_s_per_unit"] * (yaw - c["zero_turn_level"]) * sec))
+            fit: float(
+                np.degrees(
+                    c["gain_rad_s_per_unit"] * (yaw - c["zero_turn_level"]) * sec
+                )
+            )
             for fit, c in cal.items()
         }
         for sec in SECONDS
@@ -197,7 +237,11 @@ def diagnose(ckpt, data, grey, frames, args):
         start_decoded=branches["grey"][2],
         start_true=start_true,
         s_static=s_static.reshape(-1, 8).numpy(),
-        **{f"drift_{k}": v[0].astype(np.float32) for k, v in branches.items() if k in ("grey", "static")},
+        **{
+            f"drift_{k}": v[0].astype(np.float32)
+            for k, v in branches.items()
+            if k in ("grey", "static")
+        },
     )
     return {
         "run": name,
@@ -210,10 +254,16 @@ def diagnose(ckpt, data, grey, frames, args):
         },
         "yaw_calibration": cal,
         "grey_yaw_minus_zero_turn": float(yaw - cal["decoded"]["zero_turn_level"]),
-        "static_yaw_minus_zero_turn": float(s_static[..., 0].mean() - cal["decoded"]["zero_turn_level"]),
+        "static_yaw_minus_zero_turn": float(
+            s_static[..., 0].mean() - cal["decoded"]["zero_turn_level"]
+        ),
         "naive_yaw_prediction_deg": naive,
         "channel_swaps": swap_table(
-            branches, s_grey.numpy(), s_static.reshape(-1, 8).numpy(), steps_at, subsets["all"]
+            branches,
+            s_grey.numpy(),
+            s_static.reshape(-1, 8).numpy(),
+            steps_at,
+            subsets["all"],
         ),
         "drift": drift,
         "velocity_field": fields,
@@ -280,17 +330,28 @@ def plot(path: Path, per_run: list[dict], out_dir: Path) -> None:
     ax[0, 1].legend(fontsize=7, frameon=False)
 
     for i, ch in enumerate(CHANNELS):
-        v = [r["channel_swaps"][ch]["drift_deg_adding_grey_channel_to_static"]["2s"] for r in per_run]
+        v = [
+            r["channel_swaps"][ch]["drift_deg_adding_grey_channel_to_static"]["2s"]
+            for r in per_run
+        ]
         ax[1, 0].scatter([i] * len(v), v, color="#2a78d6", s=12)
-    ax[1, 0].set_xticks(range(len(CHANNELS)), CHANNELS, rotation=45, ha="right", fontsize=7)
-    ax[1, 0].set_ylabel("change in mean drift at 2 s when only\nthis channel goes grey (deg)")
+    ax[1, 0].set_xticks(
+        range(len(CHANNELS)), CHANNELS, rotation=45, ha="right", fontsize=7
+    )
+    ax[1, 0].set_ylabel(
+        "change in mean drift at 2 s when only\nthis channel goes grey (deg)"
+    )
     ax[1, 0].axhline(0, color="#999999", lw=0.8)
 
     cond_color = {"real": "#2a78d6", "rewire": "#eb6834"}
     for r in per_run:
         f = r["velocity_field"]["static"]
         ax[1, 1].plot(
-            f["centre_deg"], f["median_drift_1s_deg"], color=cond_color[r["run"].split("_")[0]], lw=0.8, alpha=0.7
+            f["centre_deg"],
+            f["median_drift_1s_deg"],
+            color=cond_color[r["run"].split("_")[0]],
+            lw=0.8,
+            alpha=0.7,
         )
     ax[1, 1].axhline(0, color="#999999", lw=0.8)
     ax[1, 1].set_xlabel("decoded heading at t0 (deg)")
@@ -308,21 +369,42 @@ def plot(path: Path, per_run: list[dict], out_dir: Path) -> None:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument(
-        "--runs", nargs="+", default=[str(REPO_ROOT / "runs" / "sweep_turns" / "*_s[012]" / "model_best.pt")]
+        "--runs",
+        nargs="+",
+        default=[
+            str(REPO_ROOT / "runs" / "sweep_turns" / "*_s[012]" / "model_best.pt")
+        ],
     )
     ap.add_argument("--cache", default=str(REPO_ROOT / "data" / "cache_turns_test"))
     ap.add_argument("--out", default=str(REPO_ROOT / "runs" / "darkness_diag"))
-    ap.add_argument("--t0", type=float, nargs="+", default=np.arange(1.5, 8.01, 0.25).tolist(), help="seconds")
+    ap.add_argument(
+        "--t0",
+        type=float,
+        nargs="+",
+        default=np.arange(1.5, 8.01, 0.25).tolist(),
+        help="seconds",
+    )
     ap.add_argument("--dark-seconds", type=float, default=2.0)
     ap.add_argument("--still-rate", type=float, default=0.3, help="rad/s")
-    ap.add_argument("--hold-seconds", type=float, default=1.0, help="how long a frame is held to get its static T4/T5")
+    ap.add_argument(
+        "--hold-seconds",
+        type=float,
+        default=1.0,
+        help="how long a frame is held to get its static T4/T5",
+    )
     ap.add_argument("--chunk", type=int, default=20)
     ap.add_argument("--threads", type=int, default=6)
     ap.add_argument("--device", default=None, help="for the flyvis steps only")
     ap.add_argument("--flyvis-chunk", type=int, default=50)
-    ap.add_argument("--replot", action="store_true", help="redraw the figure from the existing json and npz files")
+    ap.add_argument(
+        "--replot",
+        action="store_true",
+        help="redraw the figure from the existing json and npz files",
+    )
     args = ap.parse_args(argv)
 
     torch.set_num_threads(args.threads)
@@ -341,8 +423,12 @@ def main(argv=None) -> int:
     data = BCData(T4T5Cache(args.cache), clocks_from_cfg(cfg))
     grey = grey_t4t5(cfg, device).cpu()
     last = [int(round(t * 100)) - 1 for t in args.t0]
-    hexals = np.stack([Trajectory.load(p).hexals[last] for p in data.cache.trajectories], axis=1)
-    frames = static_t4t5(cfg, device, hexals.reshape(-1, 721), args.hold_seconds, args.flyvis_chunk)
+    hexals = np.stack(
+        [Trajectory.load(p).hexals[last] for p in data.cache.trajectories], axis=1
+    )
+    frames = static_t4t5(
+        cfg, device, hexals.reshape(-1, 721), args.hold_seconds, args.flyvis_chunk
+    )
     frames = frames.astype(np.float16).astype(np.float32)
     gc.collect()
     torch.cuda.empty_cache()  # the GPU is shared; the rest of this script runs on the CPU
@@ -360,7 +446,12 @@ def main(argv=None) -> int:
             f"static mean {s['mean']:6.1f} |.| {s['mean_abs']:5.1f}  yaw-only prediction {yaw_only:6.1f}",
             flush=True,
         )
-    report = {"runs": per_run, "pooled": pool(per_run), "t0_seconds": args.t0, "cache": args.cache}
+    report = {
+        "runs": per_run,
+        "pooled": pool(per_run),
+        "t0_seconds": args.t0,
+        "cache": args.cache,
+    }
     (out_dir / "diagnose_darkness.json").write_text(json.dumps(report, indent=2))
     plot(out_dir / "diagnose_darkness.png", per_run, out_dir)
     print(json.dumps(report["pooled"], indent=1))

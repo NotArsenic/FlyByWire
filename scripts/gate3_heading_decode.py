@@ -42,7 +42,13 @@ from flybywire.config import REPO_ROOT
 from flybywire.data.cache import T4T5Cache
 from flybywire.eval.closed_loop import load_checkpoint
 from flybywire.eval.metrics import angular_error_deg, heading_r2
-from flybywire.eval.ring import bump, model_layout, rate_floor, ring_activity, ring_tracking
+from flybywire.eval.ring import (
+    bump,
+    model_layout,
+    rate_floor,
+    ring_activity,
+    ring_tracking,
+)
 from flybywire.train.bc import BCData
 
 MIN_R2 = 0.8
@@ -60,7 +66,11 @@ def run_episodes(model, data: BCData, device, chunk: int = 20):
         batch = data.batch(idx, device)
         out = model.run(batch["x16"].float(), model.init_state(len(idx)), t0=0)
         epg = out["r"].index_select(-1, model.heading.source_index).cpu().numpy()
-        true = torch.atan2(batch["heading"][..., 0], batch["heading"][..., 1]).cpu().numpy()
+        true = (
+            torch.atan2(batch["heading"][..., 0], batch["heading"][..., 1])
+            .cpu()
+            .numpy()
+        )
         for j, i in enumerate(idx):
             n = data.cache.length(i)
             rates.append(epg[j, :n])
@@ -77,21 +87,50 @@ def plot(path: Path, panels: list[dict], heading, example: int) -> None:
 
     fig, ax = plt.subplots(len(panels), 3, figsize=(14, 4.2 * len(panels)))
     for row, p in zip(ax, panels, strict=True):
-        label, prof, bumps, rep = p["label"], p["profile"][example], p["bumps"], p["report"]
+        label, prof, bumps, rep = (
+            p["label"],
+            p["profile"][example],
+            p["bumps"],
+            p["report"],
+        )
         t = np.arange(len(prof)) / 100
         n = prof.shape[1]
-        row[0].imshow(prof.T, origin="lower", aspect="auto", extent=(0, t[-1], 0, n), cmap="viridis")
-        pos = ((rep["sign"] * heading[example] + np.radians(rep["offset_deg"])) % (2 * np.pi)) / (2 * np.pi) * n
-        row[0].plot(t, np.where(np.abs(np.diff(pos, prepend=pos[0])) > n / 2, np.nan, pos), color="w", lw=1.2)
+        row[0].imshow(
+            prof.T,
+            origin="lower",
+            aspect="auto",
+            extent=(0, t[-1], 0, n),
+            cmap="viridis",
+        )
+        pos = (
+            (
+                (rep["sign"] * heading[example] + np.radians(rep["offset_deg"]))
+                % (2 * np.pi)
+            )
+            / (2 * np.pi)
+            * n
+        )
+        row[0].plot(
+            t,
+            np.where(np.abs(np.diff(pos, prepend=pos[0])) > n / 2, np.nan, pos),
+            color="w",
+            lw=1.2,
+        )
         row[0].set_xlabel("time (s)")
         row[0].set_ylabel("wedge")
-        row[0].set_title(f"{label}\nepisode {example}; white: true heading on the fitted ring", fontsize=9)
+        row[0].set_title(
+            f"{label}\nepisode {example}; white: true heading on the fitted ring",
+            fontsize=9,
+        )
         h = np.concatenate([x[WASHOUT:] for x in heading])
         a = np.concatenate([b["angle"][WASHOUT:] for b in bumps])
         row[1].hist2d(np.degrees(h), np.degrees(a), bins=72, cmap="Blues", norm="log")
         row[1].set_xlabel("true heading (deg)")
         row[1].set_ylabel("bump angle (deg)")
-        row[1].set_title(f"alignment {rep['alignment']:.2f} (null {rep['alignment_null']:.2f})", fontsize=9)
+        row[1].set_title(
+            f"alignment {rep['alignment']:.2f} (null {rep['alignment_null']:.2f})",
+            fontsize=9,
+        )
         f = np.concatenate([b["fraction"][WASHOUT:] for b in bumps])
         row[2].hist(f, bins=50, range=(0, 1), color="#4c78a8")
         row[2].axvline(MIN_FRACTION, color="k", lw=1, ls="--")
@@ -107,8 +146,12 @@ def plot(path: Path, panels: list[dict], heading, example: int) -> None:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ckpt", default=str(REPO_ROOT / "runs" / "bc" / "turns_s0" / "model_best.pt"))
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--ckpt", default=str(REPO_ROOT / "runs" / "bc" / "turns_s0" / "model_best.pt")
+    )
     ap.add_argument("--cache", default=str(REPO_ROOT / "data" / "cache_turns_test"))
     ap.add_argument("--out", default=None)
     ap.add_argument("--device", default=None)
@@ -125,22 +168,46 @@ def main(argv=None) -> int:
     decode = {"r2": heading_r2(pred, true), "err_deg": angular_error_deg(pred, true)}
 
     panels = []
-    for mode, role in (("anatomical", "gate"), ("tuning", "reference only, bump by construction")):
+    for mode, role in (
+        ("anatomical", "gate"),
+        ("tuning", "reference only, bump by construction"),
+    ):
         layout = model_layout(cfg, model, mode)
         profile = [ring_activity(r, layout) for r in rates]
         bumps = [bump(p) for p in profile]
-        panels.append({"label": f"{layout.label} ({role})", "profile": profile, "bumps": bumps, "mode": mode,
-                       "layout": layout, "report": ring_tracking(bumps, heading, WASHOUT)})
+        panels.append(
+            {
+                "label": f"{layout.label} ({role})",
+                "profile": profile,
+                "bumps": bumps,
+                "mode": mode,
+                "layout": layout,
+                "report": ring_tracking(bumps, heading, WASHOUT),
+            }
+        )
     anat = panels[0]["report"]
     floor = rate_floor(rates, WASHOUT)
-    resting = [bump(ring_activity(r - floor, panels[0]["layout"]))["fraction"][WASHOUT:] for r in rates]
+    resting = [
+        bump(ring_activity(r - floor, panels[0]["layout"]))["fraction"][WASHOUT:]
+        for r in rates
+    ]
     anat["fraction_mean_floor_subtracted"] = float(np.concatenate(resting).mean())
     checks = {
-        "heading_r2": {"value": decode["r2"], "threshold": MIN_R2, "pass": decode["r2"] > MIN_R2},
-        "single_bump": {"value": anat["fraction_mean"], "threshold": MIN_FRACTION,
-                        "pass": anat["fraction_mean"] > MIN_FRACTION},
-        "bump_tracks_heading": {"value": anat["alignment"], "threshold": MIN_ALIGNMENT,
-                                "pass": anat["alignment"] > MIN_ALIGNMENT},
+        "heading_r2": {
+            "value": decode["r2"],
+            "threshold": MIN_R2,
+            "pass": decode["r2"] > MIN_R2,
+        },
+        "single_bump": {
+            "value": anat["fraction_mean"],
+            "threshold": MIN_FRACTION,
+            "pass": anat["fraction_mean"] > MIN_FRACTION,
+        },
+        "bump_tracks_heading": {
+            "value": anat["alignment"],
+            "threshold": MIN_ALIGNMENT,
+            "pass": anat["alignment"] > MIN_ALIGNMENT,
+        },
     }
     report = {
         "checkpoint": str(ckpt),
@@ -152,18 +219,28 @@ def main(argv=None) -> int:
         "decode": decode,
         "ring": {p["mode"]: {"layout": p["label"], **p["report"]} for p in panels},
     }
-    out_dir = Path(args.out) if args.out else REPO_ROOT / "runs" / "gate3" / ckpt.parent.name
+    out_dir = (
+        Path(args.out) if args.out else REPO_ROOT / "runs" / "gate3" / ckpt.parent.name
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "report.json").write_text(json.dumps(report, indent=2))
     span = [np.ptp(np.unwrap(h)) for h in heading]
     plot(out_dir / "ring_vs_heading.png", panels, heading, int(np.argmax(span)))
 
     for k, c in checks.items():
-        print(f"{k:22s} {c['value']:.3f}  (> {c['threshold']})  {'pass' if c['pass'] else 'FAIL'}")
-    print(f"share with resting rates subtracted: {anat['fraction_mean_floor_subtracted']:.3f}")
+        print(
+            f"{k:22s} {c['value']:.3f}  (> {c['threshold']})  {'pass' if c['pass'] else 'FAIL'}"
+        )
+    print(
+        f"share with resting rates subtracted: {anat['fraction_mean_floor_subtracted']:.3f}"
+    )
     ref = report["ring"]["tuning"]
-    print(f"reference, tuning layout: fraction {ref['fraction_mean']:.3f}, alignment {ref['alignment']:.3f}")
-    print(f"Gate 3 {'PASS' if report['pass'] else 'FAIL'}; wrote {out_dir / 'report.json'}")
+    print(
+        f"reference, tuning layout: fraction {ref['fraction_mean']:.3f}, alignment {ref['alignment']:.3f}"
+    )
+    print(
+        f"Gate 3 {'PASS' if report['pass'] else 'FAIL'}; wrote {out_dir / 'report.json'}"
+    )
     return 0
 
 

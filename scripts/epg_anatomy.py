@@ -55,19 +55,29 @@ def load_nodes(path: str, neuron_ids: np.ndarray) -> tuple[np.ndarray, np.ndarra
 class Grid:
     def __init__(self, points: np.ndarray):
         lo = points.min(0)
-        self.edges = [np.arange(lo[i], points[:, i].max() + VOXEL_UM, VOXEL_UM) for i in range(3)]
+        self.edges = [
+            np.arange(lo[i], points[:, i].max() + VOXEL_UM, VOXEL_UM) for i in range(3)
+        ]
 
     def density(self, points: np.ndarray) -> np.ndarray:
         h, _ = np.histogramdd(points, bins=self.edges)
         return ndimage.gaussian_filter(h, SIGMA_VOXELS)
 
     def index(self, points: np.ndarray) -> tuple:
-        return tuple(np.clip(((points[:, i] - self.edges[i][0]) // VOXEL_UM).astype(int), 0, len(self.edges[i]) - 2)
-                     for i in range(3))
+        return tuple(
+            np.clip(
+                ((points[:, i] - self.edges[i][0]) // VOXEL_UM).astype(int),
+                0,
+                len(self.edges[i]) - 2,
+            )
+            for i in range(3)
+        )
 
     def centers(self, mask: np.ndarray) -> np.ndarray:
         idx = np.argwhere(mask)
-        return np.stack([self.edges[i][0] + VOXEL_UM * (idx[:, i] + 0.5) for i in range(3)], axis=1)
+        return np.stack(
+            [self.edges[i][0] + VOXEL_UM * (idx[:, i] + 0.5) for i in range(3)], axis=1
+        )
 
 
 def eb_mask(grid: Grid, er: np.ndarray, epg: np.ndarray, frac: float) -> np.ndarray:
@@ -77,7 +87,9 @@ def eb_mask(grid: Grid, er: np.ndarray, epg: np.ndarray, frac: float) -> np.ndar
     return labels == labels[seed]
 
 
-def eb_angles(neuron_pts: list[np.ndarray], eb_points: np.ndarray, center: np.ndarray) -> dict:
+def eb_angles(
+    neuron_pts: list[np.ndarray], eb_points: np.ndarray, center: np.ndarray
+) -> dict:
     axes, sd = ring_frame(eb_points, center)
     centroids = np.stack([p.mean(0) for p in neuron_pts])
     node_angles = [ring_angles(p, center, axes, sd) for p in neuron_pts]
@@ -86,15 +98,21 @@ def eb_angles(neuron_pts: list[np.ndarray], eb_points: np.ndarray, center: np.nd
         "sd": sd,
         "centroid_um": centroids,
         "angle": ring_angles(centroids, center, axes, sd),
-        "angle_raw": np.arctan2((centroids - center) @ axes[0], (centroids - center) @ axes[1]),
+        "angle_raw": np.arctan2(
+            (centroids - center) @ axes[0], (centroids - center) @ axes[1]
+        ),
         "resultant": np.array([np.abs(np.exp(1j * a).mean()) for a in node_angles]),
     }
 
 
-def partner_jaccard(M: np.ndarray, epg: np.ndarray, partners: np.ndarray, direction: str) -> np.ndarray:
+def partner_jaccard(
+    M: np.ndarray, epg: np.ndarray, partners: np.ndarray, direction: str
+) -> np.ndarray:
     """Jaccard similarity of the partner sets of every EPG pair (partners: neuron indices)."""
     out_edges, in_edges = M[np.ix_(epg, partners)], M[np.ix_(partners, epg)].T
-    sets = {"out": out_edges, "in": in_edges, "both": out_edges | in_edges}[direction].astype(float)
+    sets = {"out": out_edges, "in": in_edges, "both": out_edges | in_edges}[
+        direction
+    ].astype(float)
     inter = sets @ sets.T
     union = sets.sum(1)[:, None] + sets.sum(1)[None, :] - inter
     return np.where(union > 0, inter / np.maximum(union, 1), 0.0)
@@ -145,9 +163,13 @@ def uniformity(theta: np.ndarray) -> dict:
         "chi2_16": chi2,
         "chi2_p": float(stats.chi2.sf(chi2, N_WEDGES - 1)),
         "rayleigh_R": float(abs(z)),
-        "rayleigh_p": float(np.exp(np.sqrt(1 + 4 * n + 4 * (n**2 - rn**2)) - (1 + 2 * n))),
+        "rayleigh_p": float(
+            np.exp(np.sqrt(1 + 4 * n + 4 * (n**2 - rn**2)) - (1 + 2 * n))
+        ),
         "max_gap_deg": float(np.degrees(gaps.max())),
-        "expected_max_gap_deg_if_uniform": float(np.degrees(2 * np.pi / n * (1 / np.arange(1, n + 1)).sum())),
+        "expected_max_gap_deg_if_uniform": float(
+            np.degrees(2 * np.pi / n * (1 / np.arange(1, n + 1)).sum())
+        ),
     }
 
 
@@ -157,7 +179,13 @@ def plot(path: Path, ctx: dict) -> None:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    theta, ok, jac, uni, ck = ctx["theta"], ctx["ok"], ctx["jaccard"], ctx["uniformity"], ctx["jaccard_check"]
+    theta, ok, jac, uni, ck = (
+        ctx["theta"],
+        ctx["ok"],
+        ctx["jaccard"],
+        ctx["uniformity"],
+        ctx["jaccard_check"],
+    )
     axes, sd, center = ctx["axes"], ctx["sd"], ctx["center"]
     keep = np.flatnonzero(ok)
     colors = plt.get_cmap("twilight_shifted")((theta % (2 * np.pi)) / (2 * np.pi))
@@ -173,24 +201,49 @@ def plot(path: Path, ctx: dict) -> None:
 
     cen = (ctx["centroids"] - center) @ axes.T
     rng = np.random.default_rng(0)
-    for a, (u, v), names in ((ax[0, 0], (0, 1), ("lateral", "dorsal")), (ax[0, 1], (0, 2), ("lateral", "normal"))):
+    for a, (u, v), names in (
+        (ax[0, 0], (0, 1), ("lateral", "dorsal")),
+        (ax[0, 1], (0, 2), ("lateral", "normal")),
+    ):
         for i in keep:
             d = (ctx["neuron_pts"][i] - center) @ axes.T
             pick = rng.choice(len(d), min(len(d), 400), replace=False)
-            a.scatter(d[pick, u], d[pick, v], s=1.5, color=colors[i], alpha=0.5, linewidths=0)
-        a.scatter(cen[ok, u], cen[ok, v], s=22, color=colors[ok], edgecolor=ink, linewidth=0.6, zorder=3)
-        a.scatter(cen[~ok, u], cen[~ok, v], s=30, color=colors[~ok], marker="x", zorder=3)
+            a.scatter(
+                d[pick, u], d[pick, v], s=1.5, color=colors[i], alpha=0.5, linewidths=0
+            )
+        a.scatter(
+            cen[ok, u],
+            cen[ok, v],
+            s=22,
+            color=colors[ok],
+            edgecolor=ink,
+            linewidth=0.6,
+            zorder=3,
+        )
+        a.scatter(
+            cen[~ok, u], cen[~ok, v], s=30, color=colors[~ok], marker="x", zorder=3
+        )
         a.set_aspect("equal")
         a.set_xlabel(f"{names[0]} (um)")
         a.set_ylabel(f"{names[1]} (um)")
         style(a)
-    ax[0, 0].set_title("EB nodes of EPG neurons (dots: centroids, x: unreliable)", fontsize=10)
+    ax[0, 0].set_title(
+        "EB nodes of EPG neurons (dots: centroids, x: unreliable)", fontsize=10
+    )
     ax[0, 1].set_title("same, edge-on", fontsize=10)
 
     ax[0, 2].remove()
     polar = fig.add_subplot(2, 3, 3, projection="polar")
     radius = np.hypot(*(cen[:, :2] / sd).T)
-    polar.scatter(theta[ok], radius[ok], s=30, color=colors[ok], edgecolor=ink, linewidth=0.5, zorder=3)
+    polar.scatter(
+        theta[ok],
+        radius[ok],
+        s=30,
+        color=colors[ok],
+        edgecolor=ink,
+        linewidth=0.5,
+        zorder=3,
+    )
     polar.set_theta_zero_location("N")
     polar.set_theta_direction(-1)
     polar.set_yticks([])
@@ -201,23 +254,40 @@ def plot(path: Path, ctx: dict) -> None:
     ax[1, 0].axhline(n / N_WEDGES, color=ink, linewidth=1, linestyle="--")
     ax[1, 0].set_xlabel("wedge (22.5 deg each)")
     ax[1, 0].set_ylabel("EPG neurons")
-    ax[1, 0].set_title(f"angle histogram (dashed: uniform), chi2 p = {uni['chi2_p']:.2f}", fontsize=10)
+    ax[1, 0].set_title(
+        f"angle histogram (dashed: uniform), chi2 p = {uni['chi2_p']:.2f}", fontsize=10
+    )
     style(ax[1, 0])
 
     dist, j = pair_values(theta[keep], jac[np.ix_(keep, keep)])
     deg = np.degrees(dist)
     ax[1, 1].scatter(deg, j, s=3, color=blue, alpha=0.25, linewidths=0)
     bins = np.linspace(0, 180, 10)
-    means = [j[(deg >= lo) & (deg < hi)].mean() for lo, hi in zip(bins[:-1], bins[1:], strict=True)]
-    ax[1, 1].plot(0.5 * (bins[1:] + bins[:-1]), means, color=red, linewidth=2, marker="o", markersize=5)
-    ax[1, 1].set_title(f"partner overlap vs angle: rho = {ck['spearman_rho']:.2f}, "
-                       f"p = {ck['p_one_sided_negative']:.4f}", fontsize=10)
+    means = [
+        j[(deg >= lo) & (deg < hi)].mean()
+        for lo, hi in zip(bins[:-1], bins[1:], strict=True)
+    ]
+    ax[1, 1].plot(
+        0.5 * (bins[1:] + bins[:-1]),
+        means,
+        color=red,
+        linewidth=2,
+        marker="o",
+        markersize=5,
+    )
+    ax[1, 1].set_title(
+        f"partner overlap vs angle: rho = {ck['spearman_rho']:.2f}, "
+        f"p = {ck['p_one_sided_negative']:.4f}",
+        fontsize=10,
+    )
     ax[1, 1].set_xlabel("angular distance between two EPG neurons (deg)")
     ax[1, 1].set_ylabel("Jaccard of PEN/PEG/D7 partners")
     style(ax[1, 1])
 
     ax[1, 2].scatter(ctx["n_nodes"][ok], ctx["resultant"][ok], s=18, color=blue)
-    ax[1, 2].scatter(ctx["n_nodes"][~ok], ctx["resultant"][~ok], s=24, color="#999999", marker="x")
+    ax[1, 2].scatter(
+        ctx["n_nodes"][~ok], ctx["resultant"][~ok], s=24, color="#999999", marker="x"
+    )
     ax[1, 2].axvline(MIN_NODES, color=ink, linewidth=1, linestyle="--")
     ax[1, 2].axhline(MIN_RESULTANT, color=ink, linewidth=1, linestyle="--")
     ax[1, 2].set_xscale("log")
@@ -231,20 +301,39 @@ def plot(path: Path, ctx: dict) -> None:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("skeletons", help="skeleton parquet (columns neuron, x, y, z in nm)")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "skeletons", help="skeleton parquet (columns neuron, x, y, z in nm)"
+    )
     ap.add_argument("--graph", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--report-dir", default=None)
-    ap.add_argument("--frac", type=float, default=0.3, help="ER density fraction that bounds the EB blob")
+    ap.add_argument(
+        "--frac",
+        type=float,
+        default=0.3,
+        help="ER density fraction that bounds the EB blob",
+    )
     ap.add_argument("--n-perm", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args(argv)
 
     cfg = load_config()
-    graph = Path(args.graph) if args.graph else data_dir(cfg) / "flywire" / "processed" / "cx_graph.npz"
-    out = Path(args.out) if args.out else data_dir(cfg) / "flywire" / "processed" / "epg_eb_angles.npz"
-    report_dir = Path(args.report_dir) if args.report_dir else REPO_ROOT / "runs" / "anatomy"
+    graph = (
+        Path(args.graph)
+        if args.graph
+        else data_dir(cfg) / "flywire" / "processed" / "cx_graph.npz"
+    )
+    out = (
+        Path(args.out)
+        if args.out
+        else data_dir(cfg) / "flywire" / "processed" / "epg_eb_angles.npz"
+    )
+    report_dir = (
+        Path(args.report_dir) if args.report_dir else REPO_ROOT / "runs" / "anatomy"
+    )
     g = np.load(graph, allow_pickle=False)
     ids, M = g["neuron_ids"], g["M"]
     epg_idx = g["group__EPG"]
@@ -263,8 +352,13 @@ def main(argv=None) -> int:
         center = grid.centers(mask).mean(0)
         pts = [arbors[i][mask[grid.index(arbors[i])]] for i in only]
         res = eb_angles(pts, epg_in, center)
-        res.update(center=center, neuron_pts=pts, n_nodes=np.array([len(p) for p in pts]),
-                   volume_um3=float(mask.sum() * VOXEL_UM**3), frac_epg_in_eb=float(len(epg_in) / len(epg)))
+        res.update(
+            center=center,
+            neuron_pts=pts,
+            n_nodes=np.array([len(p) for p in pts]),
+            volume_um3=float(mask.sum() * VOXEL_UM**3),
+            frac_epg_in_eb=float(len(epg_in) / len(epg)),
+        )
         return res
 
     everyone = np.arange(len(epg_idx))
@@ -274,8 +368,10 @@ def main(argv=None) -> int:
     nn_ = main_res["n_nodes"]
     ok = (nn_ >= MIN_NODES) & (main_res["resultant"] >= MIN_RESULTANT)
     keep = np.flatnonzero(ok)
-    print(f"{ok.sum()}/{len(ok)} EPG neurons with a reliable EB angle; dropped types: "
-          f"{sorted({str(g['types'][epg_idx[i]]) for i in np.flatnonzero(~ok)})}")
+    print(
+        f"{ok.sum()}/{len(ok)} EPG neurons with a reliable EB angle; dropped types: "
+        f"{sorted({str(g['types'][epg_idx[i]]) for i in np.flatnonzero(~ok)})}"
+    )
 
     def rms_deg(a, b) -> float:
         return float(np.degrees(np.sqrt((wrap(a - b) ** 2).mean())))
@@ -284,19 +380,31 @@ def main(argv=None) -> int:
     for frac in (0.4, 0.5):
         other = angles_for(frac, keep)
         diff = wrap(other["angle"] - theta[keep])
-        sens[f"frac_{frac}"] = {"rms_angle_diff_deg": rms_deg(other["angle"], theta[keep]),
-                                "max_angle_diff_deg": float(np.degrees(np.abs(diff).max())),
-                                "volume_um3": other["volume_um3"]}
+        sens[f"frac_{frac}"] = {
+            "rms_angle_diff_deg": rms_deg(other["angle"], theta[keep]),
+            "max_angle_diff_deg": float(np.degrees(np.abs(diff).max())),
+            "volume_um3": other["volume_um3"],
+        }
     epg_median = np.median(np.concatenate(main_res["neuron_pts"]), axis=0)
     sens["center_at_epg_node_median"] = {
         "offset_um": float(np.linalg.norm(epg_median - center)),
-        "rms_angle_diff_deg": rms_deg(ring_angles(main_res["centroid_um"][keep], epg_median, axes, sd), theta[keep]),
+        "rms_angle_diff_deg": rms_deg(
+            ring_angles(main_res["centroid_um"][keep], epg_median, axes, sd),
+            theta[keep],
+        ),
     }
-    sens["no_in_plane_whitening"] = {"rms_angle_diff_deg": rms_deg(main_res["angle_raw"][keep], theta[keep])}
+    sens["no_in_plane_whitening"] = {
+        "rms_angle_diff_deg": rms_deg(main_res["angle_raw"][keep], theta[keep])
+    }
 
     partners = np.concatenate([g["group__PEN"], g["group__PEG"], g["group__D7"]])
     jac = {d: partner_jaccard(M, epg_idx, partners, d) for d in ("both", "out", "in")}
-    checks = {d: jaccard_check(theta[keep], jac[d][np.ix_(keep, keep)], args.n_perm, args.seed) for d in jac}
+    checks = {
+        d: jaccard_check(
+            theta[keep], jac[d][np.ix_(keep, keep)], args.n_perm, args.seed
+        )
+        for d in jac
+    }
     checks["both_all_51"] = jaccard_check(theta, jac["both"], args.n_perm, args.seed)
     uni = uniformity(theta[keep])
 
@@ -328,27 +436,52 @@ def main(argv=None) -> int:
             "fraction_of_epg_nodes_in_eb": main_res["frac_epg_in_eb"],
         },
         "n_reliable": int(ok.sum()),
-        "unreliable": [{"type": str(g["types"][epg_idx[i]]), "instance": str(g["instances"][epg_idx[i]]),
-                        "n_eb_nodes": int(nn_[i]), "node_angle_resultant": float(main_res["resultant"][i])}
-                       for i in np.flatnonzero(~ok)],
-        "n_eb_nodes_reliable": {"min": int(nn_[keep].min()), "median": float(np.median(nn_[keep])),
-                                "max": int(nn_[keep].max())},
-        "node_angle_resultant_reliable": {"min": float(main_res["resultant"][keep].min()),
-                                          "median": float(np.median(main_res["resultant"][keep]))},
+        "unreliable": [
+            {
+                "type": str(g["types"][epg_idx[i]]),
+                "instance": str(g["instances"][epg_idx[i]]),
+                "n_eb_nodes": int(nn_[i]),
+                "node_angle_resultant": float(main_res["resultant"][i]),
+            }
+            for i in np.flatnonzero(~ok)
+        ],
+        "n_eb_nodes_reliable": {
+            "min": int(nn_[keep].min()),
+            "median": float(np.median(nn_[keep])),
+            "max": int(nn_[keep].max()),
+        },
+        "node_angle_resultant_reliable": {
+            "min": float(main_res["resultant"][keep].min()),
+            "median": float(np.median(main_res["resultant"][keep])),
+        },
         "angle_uniformity_reliable": uni,
         "partner_jaccard_vs_angle_reliable": checks,
         "sensitivity_reliable": sens,
         "angle_convention": "0 = dorsal in the ring plane, positive toward +x (FlyWire x); arbitrary up to "
-                            "rotation and reflection, which the topography scores are invariant to",
+        "rotation and reflection, which the topography scores are invariant to",
     }
     (report_dir / "epg_eb_angles.json").write_text(json.dumps(report, indent=2))
-    plot(report_dir / "epg_eb_angles.png", {
-        "theta": theta, "ok": ok, "jaccard": jac["both"], "axes": axes, "sd": sd, "center": center,
-        "neuron_pts": main_res["neuron_pts"], "centroids": main_res["centroid_um"], "uniformity": uni,
-        "jaccard_check": checks["both"], "n_nodes": nn_, "resultant": main_res["resultant"],
-    })
+    plot(
+        report_dir / "epg_eb_angles.png",
+        {
+            "theta": theta,
+            "ok": ok,
+            "jaccard": jac["both"],
+            "axes": axes,
+            "sd": sd,
+            "center": center,
+            "neuron_pts": main_res["neuron_pts"],
+            "centroids": main_res["centroid_um"],
+            "uniformity": uni,
+            "jaccard_check": checks["both"],
+            "n_nodes": nn_,
+            "resultant": main_res["resultant"],
+        },
+    )
     print(json.dumps(report, indent=2))
-    print(f"wrote {out}, {report_dir / 'epg_eb_angles.json'}, {report_dir / 'epg_eb_angles.png'}")
+    print(
+        f"wrote {out}, {report_dir / 'epg_eb_angles.json'}, {report_dir / 'epg_eb_angles.png'}"
+    )
     return 0
 
 

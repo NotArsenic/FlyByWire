@@ -87,12 +87,20 @@ class Ridge:
 def r2(st: Stats, beta: np.ndarray, b: float) -> float:
     """R^2 of x @ beta + b on the rows summarised in st."""
     xx, xy, sx = (t.cpu().numpy() for t in (st.xx, st.xy, st.sx))
-    sse = st.syy - 2 * (beta @ xy + b * st.sy) + beta @ xx @ beta + 2 * b * (beta @ sx) + st.n * b * b
+    sse = (
+        st.syy
+        - 2 * (beta @ xy + b * st.sy)
+        + beta @ xx @ beta
+        + 2 * b * (beta @ sx)
+        + st.n * b * b
+    )
     sst = st.syy - st.sy**2 / st.n
     return float(1 - sse / sst)
 
 
-def pooling_matrix(n_hexals: int, extent: int, kernel_size: int, grid: int) -> np.ndarray:
+def pooling_matrix(
+    n_hexals: int, extent: int, kernel_size: int, grid: int
+) -> np.ndarray:
     xy = hexal_normalized_coords(extent, kernel_size)
     bins = np.clip(((xy + 1) / 2 * grid).astype(int), 0, grid - 1)
     cell = bins[:, 1] * grid + bins[:, 0]
@@ -108,15 +116,31 @@ def split(n: int, seed: int) -> dict[str, np.ndarray]:
     perm = np.random.default_rng(seed).permutation(n)
     n_test = max(1, round(SPLIT[2] * n))
     n_val = max(1, round(SPLIT[1] * n))
-    return {"test": perm[:n_test], "val": perm[n_test : n_test + n_val], "train": perm[n_test + n_val :]}
+    return {
+        "test": perm[:n_test],
+        "val": perm[n_test : n_test + n_val],
+        "train": perm[n_test + n_val :],
+    }
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--cache", default=None)
     ap.add_argument("--out", default=None)
-    ap.add_argument("--washout", type=int, default=50, help="frames dropped at the start of each episode")
-    ap.add_argument("--grid", type=int, default=4, help="pooled variant: grid x grid bins per subtype")
+    ap.add_argument(
+        "--washout",
+        type=int,
+        default=50,
+        help="frames dropped at the start of each episode",
+    )
+    ap.add_argument(
+        "--grid",
+        type=int,
+        default=4,
+        help="pooled variant: grid x grid bins per subtype",
+    )
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", default=None)
     ap.add_argument("overrides", nargs="*")
@@ -124,10 +148,18 @@ def main(argv=None) -> int:
     cfg = load_config(overrides=args.overrides)
     cache = T4T5Cache(args.cache or data_dir(cfg) / "cache")
     out = Path(args.out) if args.out else runs_dir(cfg) / "gate2"
-    device = torch.device(args.device or ("cuda" if torch.cuda.is_available() else "cpu"))
+    device = torch.device(
+        args.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    )
     n_types, n_hexals = cache.data.shape[1:]
-    pool = torch.from_numpy(pooling_matrix(n_hexals, int(cfg.vision.boxeye.extent),
-                                           int(cfg.vision.boxeye.kernel_size), args.grid)).to(device)
+    pool = torch.from_numpy(
+        pooling_matrix(
+            n_hexals,
+            int(cfg.vision.boxeye.extent),
+            int(cfg.vision.boxeye.kernel_size),
+            args.grid,
+        )
+    ).to(device)
 
     sets = split(len(cache), args.seed)
     which = {int(i): name for name, idx in sets.items() for i in idx}
@@ -140,8 +172,14 @@ def main(argv=None) -> int:
         tr = Trajectory.load(path, load_hexals=False)
         metas.append(tr.meta)
         y = torch.from_numpy(tr.yaw_rate[args.washout :]).to(device)
-        x = torch.from_numpy(np.array(cache.episode(i)[args.washout :])).to(device).float()
-        if shift is None:  # any constant shift works; it just keeps the float32 sums accurate
+        x = (
+            torch.from_numpy(np.array(cache.episode(i)[args.washout :]))
+            .to(device)
+            .float()
+        )
+        if (
+            shift is None
+        ):  # any constant shift works; it just keeps the float32 sums accurate
             shift = x.mean(0)
         x = x - shift
         full[which[i]].add(x.reshape(len(x), -1), y)
@@ -157,8 +195,12 @@ def main(argv=None) -> int:
         best = max(val_r2, key=val_r2.get)
         final = Ridge(stats["train"] + stats["val"])
         beta, b = final.coef(best)
-        return {"alpha": best, "val_r2": val_r2, "test_r2": r2(stats["test"], beta, b),
-                "train_val_r2": r2(stats["train"] + stats["val"], beta, b)}
+        return {
+            "alpha": best,
+            "val_r2": val_r2,
+            "test_r2": r2(stats["test"], beta, b),
+            "train_val_r2": r2(stats["train"] + stats["val"], beta, b),
+        }
 
     res_full = fit(full)
     res_pooled = fit(pooled)
@@ -170,21 +212,36 @@ def main(argv=None) -> int:
         "passed": bool(passed),
         "test_r2": res_full["test_r2"],
         "full": {"n_features": n_types * n_hexals, **res_full},
-        "pooled": {"n_features": n_types * int(pool.shape[1]), "grid": args.grid, **res_pooled},
+        "pooled": {
+            "n_features": n_types * int(pool.shape[1]),
+            "grid": args.grid,
+            **res_pooled,
+        },
         "n_trajectories": {k: int(len(v)) for k, v in sets.items()},
-        "test_trajectories": [str(cache.trajectories[i].name) for i in sorted(sets["test"])],
+        "test_trajectories": [
+            str(cache.trajectories[i].name) for i in sorted(sets["test"])
+        ],
         "n_frames": {k: full[k].n for k in sets},
         "washout_frames": args.washout,
-        "yaw_rate": {"mean": float(yr.mean()), "sd": float(yr.std()), "abs_max": float(np.abs(yr).max())},
+        "yaw_rate": {
+            "mean": float(yr.mean()),
+            "sd": float(yr.std()),
+            "abs_max": float(np.abs(yr).max()),
+        },
         "wall_texture": sorted({m.get("wall_texture", "?") for m in metas}),
-        "cache": {k: cache.manifest.get(k) for k in ("flyvis_model", "dt", "config_hash", "total_T")},
+        "cache": {
+            k: cache.manifest.get(k)
+            for k in ("flyvis_model", "dt", "config_hash", "total_T")
+        },
         "seconds": {"read": round(read_s, 1), "total": round(time.time() - t0, 1)},
     }
     out.mkdir(parents=True, exist_ok=True)
     (out / "report.json").write_text(json.dumps(report, indent=2))
-    print(f"Gate 2 {'PASS' if passed else 'FAIL'}: test R^2 = {res_full['test_r2']:.3f} "
-          f"(full, alpha {res_full['alpha']:.0e}); pooled {args.grid}x{args.grid}: {res_pooled['test_r2']:.3f}; "
-          f"train+val R^2 {res_full['train_val_r2']:.3f}")
+    print(
+        f"Gate 2 {'PASS' if passed else 'FAIL'}: test R^2 = {res_full['test_r2']:.3f} "
+        f"(full, alpha {res_full['alpha']:.0e}); pooled {args.grid}x{args.grid}: {res_pooled['test_r2']:.3f}; "
+        f"train+val R^2 {res_full['train_val_r2']:.3f}"
+    )
     print(f"report: {out / 'report.json'}")
     return 0 if passed else 1
 

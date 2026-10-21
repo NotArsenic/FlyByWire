@@ -49,9 +49,15 @@ def half_time(t, y):
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument(
-        "--runs", nargs="+", default=[str(REPO_ROOT / "runs" / "sweep_turns" / "*_s[012]" / "model_best.pt")]
+        "--runs",
+        nargs="+",
+        default=[
+            str(REPO_ROOT / "runs" / "sweep_turns" / "*_s[012]" / "model_best.pt")
+        ],
     )
     ap.add_argument("--out", default=str(REPO_ROOT / "runs" / "darkness_diag"))
     args = ap.parse_args(argv)
@@ -75,7 +81,13 @@ def main(argv=None) -> int:
             "ring_off": np.array(curves["no_recurrence"]["ring_retention"]),
         }
 
-    report = {"dt_ms": DT_MS, "alpha_init": 0.2, "tau_at_init_ms": DT_MS / 0.2, "runs": {}, "by_condition": {}}
+    report = {
+        "dt_ms": DT_MS,
+        "alpha_init": 0.2,
+        "tau_at_init_ms": DT_MS / 0.2,
+        "runs": {},
+        "by_condition": {},
+    }
     for name, r in runs.items():
         epg = r["tau"]["EPG"]
         report["runs"][name] = {
@@ -87,10 +99,15 @@ def main(argv=None) -> int:
                         strict=True,
                     )
                 )
-                | {f"frac_over_{c}ms": float((r["tau"][g] > c).mean()) for c in LONGER_THAN_MS}
+                | {
+                    f"frac_over_{c}ms": float((r["tau"][g] > c).mean())
+                    for c in LONGER_THAN_MS
+                }
                 for g in TYPES
             },
-            "epg_decoder_weighted_median_tau_ms": round(decoder_weighted_median(epg, r["decoder_weight"]), 1),
+            "epg_decoder_weighted_median_tau_ms": round(
+                decoder_weighted_median(epg, r["decoder_weight"]), 1
+            ),
             "ring_size_half_time_s": {
                 "recurrent": half_time(r["t"], r["ring_recurrent"]),
                 "recurrence_off": half_time(r["t"], r["ring_off"]),
@@ -106,13 +123,23 @@ def main(argv=None) -> int:
         }
     for g in TYPES:
         med = {
-            c: np.array([report["runs"][n]["tau_ms"][g]["median"] for n in runs if n.startswith(c)])
+            c: np.array(
+                [
+                    report["runs"][n]["tau_ms"][g]["median"]
+                    for n in runs
+                    if n.startswith(c)
+                ]
+            )
             for c in ("real", "rewire")
         }
         report["by_condition"][g] = {
             "median_tau_ms_per_run": {c: v.tolist() for c, v in med.items()},
-            "mean_of_run_medians_ms": {c: round(float(v.mean()), 1) for c, v in med.items()},
-            "mannwhitney_p_run_medians": float(mannwhitneyu(med["real"], med["rewire"]).pvalue),
+            "mean_of_run_medians_ms": {
+                c: round(float(v.mean()), 1) for c, v in med.items()
+            },
+            "mannwhitney_p_run_medians": float(
+                mannwhitneyu(med["real"], med["rewire"]).pvalue
+            ),
         }
     (out_dir / "time_constants.json").write_text(json.dumps(report, indent=2))
     plot(out_dir / "time_constants.png", runs)

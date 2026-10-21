@@ -37,16 +37,37 @@ from flybywire.eval.closed_loop import (
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ckpt", default=str(REPO_ROOT / "runs" / "bc" / "real_s0" / "model.pt"))
-    ap.add_argument("--out", default=None, help="directory for closed_loop.json (default: the checkpoint's)")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--ckpt", default=str(REPO_ROOT / "runs" / "bc" / "real_s0" / "model.pt")
+    )
+    ap.add_argument(
+        "--out",
+        default=None,
+        help="directory for closed_loop.json (default: the checkpoint's)",
+    )
     ap.add_argument("--n", type=int, default=50)
     ap.add_argument("--seed", type=int, default=10000, help="first episode seed")
     ap.add_argument("--n-envs", type=int, default=12)
-    ap.add_argument("--record", default=None, help="save policy episodes here in the Trajectory format")
-    ap.add_argument("--label-wander-deg", type=float, default=0.0, help="wander of the labelling expert")
-    ap.add_argument("--no-label-maneuvers", dest="label_maneuvers", action="store_false",
-                    help="the labelling expert never starts a turning maneuver")
+    ap.add_argument(
+        "--record",
+        default=None,
+        help="save policy episodes here in the Trajectory format",
+    )
+    ap.add_argument(
+        "--label-wander-deg",
+        type=float,
+        default=0.0,
+        help="wander of the labelling expert",
+    )
+    ap.add_argument(
+        "--no-label-maneuvers",
+        dest="label_maneuvers",
+        action="store_false",
+        help="the labelling expert never starts a turning maneuver",
+    )
     ap.add_argument("--skip-expert", action="store_true")
     ap.add_argument("--device", default=None)
     args = ap.parse_args(argv)
@@ -57,13 +78,29 @@ def main(argv=None) -> int:
     model, cfg = load_checkpoint(ckpt, device)
     clocks = clocks_from_cfg(cfg)
     seeds = list(range(args.seed, args.seed + args.n))
-    print(f"{args.n} episodes (seeds {seeds[0]}..{seeds[-1]}), {args.n_envs} envs, checkpoint {ckpt}")
+    print(
+        f"{args.n} episodes (seeds {seeds[0]}..{seeds[-1]}), {args.n_envs} envs, checkpoint {ckpt}"
+    )
 
     t0 = time.time()
-    driver = PolicyDriver(model, cfg, args.n_envs, args.label_wander_deg, args.label_maneuvers)
-    meta = {"source": "policy", "checkpoint": str(ckpt), "label_wander_deg": args.label_wander_deg,
-            "label_maneuvers": args.label_maneuvers}
-    policy = fly(cfg, seeds, driver, args.n_envs, record_dir=args.record, meta=meta, progress=True)
+    driver = PolicyDriver(
+        model, cfg, args.n_envs, args.label_wander_deg, args.label_maneuvers
+    )
+    meta = {
+        "source": "policy",
+        "checkpoint": str(ckpt),
+        "label_wander_deg": args.label_wander_deg,
+        "label_maneuvers": args.label_maneuvers,
+    }
+    policy = fly(
+        cfg,
+        seeds,
+        driver,
+        args.n_envs,
+        record_dir=args.record,
+        meta=meta,
+        progress=True,
+    )
     t_policy = time.time() - t0
     report = {
         "checkpoint": str(ckpt),
@@ -81,7 +118,9 @@ def main(argv=None) -> int:
 
     if not args.skip_expert:
         t0 = time.time()
-        expert = fly(cfg, seeds, ExpertDriver(cfg, args.n_envs), args.n_envs, progress=True)
+        expert = fly(
+            cfg, seeds, ExpertDriver(cfg, args.n_envs), args.n_envs, progress=True
+        )
         report["expert"] = summarize(expert, clocks)
         report["expert_episodes"] = episode_rows(expert)
         report["seconds"]["expert"] = round(time.time() - t0, 1)
@@ -91,9 +130,15 @@ def main(argv=None) -> int:
     for name in ("policy", "expert"):
         if name in report:
             s = report[name]
-            print(f"{name:7s} success {s['success_rate']:.2f}  collisions {s['collisions']}  "
-                  f"decisions {s['decisions_mean']:.1f}  x_progress {s['x_progress_mean_m']:.2f} m"
-                  + (f"  heading err {s['heading_err_deg']['mean']:.1f} deg" if "heading_err_deg" in s else ""))
+            print(
+                f"{name:7s} success {s['success_rate']:.2f}  collisions {s['collisions']}  "
+                f"decisions {s['decisions_mean']:.1f}  x_progress {s['x_progress_mean_m']:.2f} m"
+                + (
+                    f"  heading err {s['heading_err_deg']['mean']:.1f} deg"
+                    if "heading_err_deg" in s
+                    else ""
+                )
+            )
     print(f"wrote {out_dir / 'closed_loop.json'}")
     return 0
 

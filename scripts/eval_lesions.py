@@ -43,7 +43,9 @@ class RingDriver(PolicyDriver):
 
     def __init__(self, model, cfg, n_envs: int):
         super().__init__(model, cfg, n_envs)
-        self.epg = torch.as_tensor(model.groups[model.group_roles["heading"]], device=self.device)
+        self.epg = torch.as_tensor(
+            model.groups[model.group_roles["heading"]], device=self.device
+        )
         self.seeds = [None] * n_envs
         self.buf = [[] for _ in range(n_envs)]
         self.rates = {}
@@ -60,7 +62,9 @@ class RingDriver(PolicyDriver):
     def act(self, frames, infos):
         n, w = frames.shape[:2]
         x = torch.from_numpy(frames).to(self.device)
-        hexals = self.eye(x.reshape(n * w, *x.shape[2:])).half().float().reshape(n, w, -1)
+        hexals = (
+            self.eye(x.reshape(n * w, *x.shape[2:])).half().float().reshape(n, w, -1)
+        )
         heading, epg = [], []
         for t in range(w):
             self.v, r = self.model.core_step(self.v, self.stepper.step(hexals[:, t]))
@@ -70,10 +74,17 @@ class RingDriver(PolicyDriver):
         for j, e in enumerate(self.experts):
             if e is not None:
                 self.buf[j].append(epg[j])
-        label = np.stack([e.act(i) if e is not None else np.zeros(4, np.float32)
-                          for e, i in zip(self.experts, infos, strict=True)])
-        return {"action": self.model.actor(r).cpu().numpy(), "label": label,
-                "heading": torch.stack(heading, dim=1).cpu().numpy()}
+        label = np.stack(
+            [
+                e.act(i) if e is not None else np.zeros(4, np.float32)
+                for e, i in zip(self.experts, infos, strict=True)
+            ]
+        )
+        return {
+            "action": self.model.actor(r).cpu().numpy(),
+            "label": label,
+            "heading": torch.stack(heading, dim=1).cpu().numpy(),
+        }
 
 
 def turn_gain(bumps, headings, sign: int) -> float:
@@ -89,7 +100,9 @@ def turn_gain(bumps, headings, sign: int) -> float:
     return float(sign * (db @ dh) / (dh @ dh)) if len(dh) else float("nan")
 
 
-def ring_summary(rates: list[np.ndarray], headings: list[np.ndarray], layout, sign: int | None) -> dict:
+def ring_summary(
+    rates: list[np.ndarray], headings: list[np.ndarray], layout, sign: int | None
+) -> dict:
     bumps = [bump(ring_activity(r, layout)) for r in rates]
     track = ring_tracking(bumps, headings, washout=WASHOUT)
     sign = track["sign"] if sign is None else sign
@@ -106,8 +119,13 @@ def ring_summary(rates: list[np.ndarray], headings: list[np.ndarray], layout, si
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ckpt", default=str(REPO_ROOT / "runs/sweep_dart/real_anatomical_s5/model_best.pt"))
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--ckpt",
+        default=str(REPO_ROOT / "runs/sweep_dart/real_anatomical_s5/model_best.pt"),
+    )
     ap.add_argument("--lesions", nargs="+", default=["none", "EPG", "PEN", "D7"])
     ap.add_argument("--n", type=int, default=200)
     ap.add_argument("--seed", type=int, default=10000)
@@ -123,7 +141,11 @@ def main(argv=None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     seeds = list(range(args.seed, args.seed + args.n))
 
-    report, sign = {"ckpt": args.ckpt, "seeds": [seeds[0], seeds[-1]], "layout": layout.label}, None
+    report, sign = {
+        "ckpt": args.ckpt,
+        "seeds": [seeds[0], seeds[-1]],
+        "layout": layout.label,
+    }, None
     for name in args.lesions:
         model.restore()
         if name != "none":
@@ -145,8 +167,10 @@ def main(argv=None) -> int:
             "heading_err_deg": s["heading_err_deg"],
             "ring": ring,
         }
-        print(f"{name:5s} success {report[name]['success']:.3f} heading err {s['heading_err_deg']['mean']:.1f} deg "
-              + " ".join(f"{k} {v:.3f}" for k, v in ring.items() if isinstance(v, float)))
+        print(
+            f"{name:5s} success {report[name]['success']:.3f} heading err {s['heading_err_deg']['mean']:.1f} deg "
+            + " ".join(f"{k} {v:.3f}" for k, v in ring.items() if isinstance(v, float))
+        )
     model.restore()
     (out / "lesions.json").write_text(json.dumps(report, indent=2))
     print(f"wrote {out / 'lesions.json'}")

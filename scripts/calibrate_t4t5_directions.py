@@ -27,7 +27,9 @@ from flybywire.vision.flyvis_stepper import FlyvisStepper
 def calibrate(cfg, device: str | None = None) -> dict:
     clocks = clocks_from_cfg(cfg)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    eye = BoxEye(int(cfg.vision.boxeye.extent), int(cfg.vision.boxeye.kernel_size), device=device)
+    eye = BoxEye(
+        int(cfg.vision.boxeye.extent), int(cfg.vision.boxeye.kernel_size), device=device
+    )
     stepper = FlyvisStepper(
         model=cfg.vision.flyvis_model,
         device=device,
@@ -35,24 +37,40 @@ def calibrate(cfg, device: str | None = None) -> dict:
         cell_types=tuple(cfg.vision.cell_types),
         steady_state_seconds=float(cfg.vision.steady_state_seconds),
     )
-    dm = measure_directions(stepper, eye, tuple(cfg.vision.cell_types), frame_size=int(cfg.env.frame_size),
-                            frame_hz=float(clocks.sensory_hz))
-    dm["boxeye"] = {"extent": int(cfg.vision.boxeye.extent), "kernel_size": int(cfg.vision.boxeye.kernel_size)}
+    dm = measure_directions(
+        stepper,
+        eye,
+        tuple(cfg.vision.cell_types),
+        frame_size=int(cfg.env.frame_size),
+        frame_hz=float(clocks.sensory_hz),
+    )
+    dm["boxeye"] = {
+        "extent": int(cfg.vision.boxeye.extent),
+        "kernel_size": int(cfg.vision.boxeye.kernel_size),
+    }
     return dm
 
 
 def print_table(dm: dict) -> None:
-    print(f"\n{'subtype':<8} {'dx':>7} {'dy':>7} {'deg':>8} {'DSI':>6}   R(+x)   R(-x)   R(+y)   R(-y)")
+    print(
+        f"\n{'subtype':<8} {'dx':>7} {'dy':>7} {'deg':>8} {'DSI':>6}   R(+x)   R(-x)   R(+y)   R(-y)"
+    )
     for t, s in dm["subtypes"].items():
         r = s["responses"]
-        print(f"{t:<8} {s['direction'][0]:>7.3f} {s['direction'][1]:>7.3f} {s['angle_deg']:>8.1f} "
-              f"{s['dsi']:>6.3f}  {r['+x']:.4f}  {r['-x']:.4f}  {r['+y']:.4f}  {r['-y']:.4f}")
+        print(
+            f"{t:<8} {s['direction'][0]:>7.3f} {s['direction'][1]:>7.3f} {s['angle_deg']:>8.1f} "
+            f"{s['dsi']:>6.3f}  {r['+x']:.4f}  {r['-x']:.4f}  {r['+y']:.4f}  {r['-y']:.4f}"
+        )
     print("(image coordinates: x right, y down; angle = atan2(dy, dx))")
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", default=None, help="default: $FLYVIS_ROOT_DIR/direction_map.json")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--out", default=None, help="default: $FLYVIS_ROOT_DIR/direction_map.json"
+    )
     ap.add_argument("--device", default=None)
     ap.add_argument("overrides", nargs="*")
     args = ap.parse_args(argv)

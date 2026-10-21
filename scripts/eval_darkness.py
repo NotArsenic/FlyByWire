@@ -36,7 +36,13 @@ from flybywire.config import REPO_ROOT
 from flybywire.data.cache import T4T5Cache
 from flybywire.data.trajectories import Trajectory
 from flybywire.eval.closed_loop import load_checkpoint
-from flybywire.eval.darkness import dark_branch, dark_series, dark_stats, grey_t4t5, snapshots
+from flybywire.eval.darkness import (
+    dark_branch,
+    dark_series,
+    dark_stats,
+    grey_t4t5,
+    snapshots,
+)
 from flybywire.eval.ring import model_layout
 from flybywire.train.bc import BCData
 
@@ -48,21 +54,50 @@ def plot(path: Path, taus, stats: dict, layout_label: str, title: str) -> None:
     import matplotlib.pyplot as plt
 
     colors = {"recurrent": "#4c78a8", "no_recurrence": "#e45756", "rest": "#888888"}
-    names = {"recurrent": "trained network", "no_recurrence": "recurrent weights zeroed", "rest": "from rest"}
+    names = {
+        "recurrent": "trained network",
+        "no_recurrence": "recurrent weights zeroed",
+        "rest": "from rest",
+    }
     fig, ax = plt.subplots(2, 2, figsize=(10, 7))
     sub = stats["still_off_axis"]
     panels = (
-        (ax[0, 0], "heading_drift_deg", "median |drift of decoded heading| (deg)", ("recurrent", "no_recurrence")),
-        (ax[0, 1], "ring_drift_deg", "median |drift of ring bump angle| (deg)", ("recurrent", "no_recurrence")),
+        (
+            ax[0, 0],
+            "heading_drift_deg",
+            "median |drift of decoded heading| (deg)",
+            ("recurrent", "no_recurrence"),
+        ),
+        (
+            ax[0, 1],
+            "ring_drift_deg",
+            "median |drift of ring bump angle| (deg)",
+            ("recurrent", "no_recurrence"),
+        ),
     )
     for a, key, ylabel, conds in panels:
         for c in conds:
             a.plot(taus, sub[c][f"{key}_median"], color=colors[c], label=names[c])
-            a.fill_between(taus, sub[c][f"{key}_q25"], sub[c][f"{key}_q75"], color=colors[c], alpha=0.15, lw=0)
+            a.fill_between(
+                taus,
+                sub[c][f"{key}_q25"],
+                sub[c][f"{key}_q75"],
+                color=colors[c],
+                alpha=0.15,
+                lw=0,
+            )
         a.set_ylabel(ylabel)
     for c in ("recurrent", "no_recurrence", "rest"):
-        ax[1, 0].plot(taus, sub[c]["ring_retention"], color=colors[c], label=names[c] + ", ring")
-        ax[1, 0].plot(taus, sub[c]["decoder_retention"], color=colors[c], ls="--", label=names[c] + ", decoder")
+        ax[1, 0].plot(
+            taus, sub[c]["ring_retention"], color=colors[c], label=names[c] + ", ring"
+        )
+        ax[1, 0].plot(
+            taus,
+            sub[c]["decoder_retention"],
+            color=colors[c],
+            ls="--",
+            label=names[c] + ", decoder",
+        )
         ax[1, 1].plot(taus, sub[c]["ring_fraction"], color=colors[c], label=names[c])
     ax[1, 0].set_ylabel("bump size / size at t0")
     ax[1, 1].set_ylabel("first-harmonic share of ring profile")
@@ -81,15 +116,29 @@ def plot(path: Path, taus, stats: dict, layout_label: str, title: str) -> None:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ckpt", default=str(REPO_ROOT / "runs" / "bc" / "turns_s0" / "model_best.pt"))
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--ckpt", default=str(REPO_ROOT / "runs" / "bc" / "turns_s0" / "model_best.pt")
+    )
     ap.add_argument("--cache", default=str(REPO_ROOT / "data" / "cache_turns_test"))
-    ap.add_argument("--t0", type=float, nargs="+", default=np.arange(1.5, 8.01, 0.25).tolist(), help="seconds")
+    ap.add_argument(
+        "--t0",
+        type=float,
+        nargs="+",
+        default=np.arange(1.5, 8.01, 0.25).tolist(),
+        help="seconds",
+    )
     ap.add_argument("--dark-seconds", type=float, default=2.0)
     ap.add_argument("--still-rate", type=float, default=0.3, help="rad/s")
     ap.add_argument("--layout", default="anatomical")
     ap.add_argument("--chunk", type=int, default=20)
-    ap.add_argument("--out", default=None, help="directory for darkness.json (default: the checkpoint's)")
+    ap.add_argument(
+        "--out",
+        default=None,
+        help="directory for darkness.json (default: the checkpoint's)",
+    )
     ap.add_argument("--device", default=None)
     args = ap.parse_args(argv)
 
@@ -112,8 +161,17 @@ def main(argv=None) -> int:
         idx = list(range(start, min(start + args.chunk, len(data))))
         batch = data.batch(idx, device)
         x = batch["x16"].float()
-        yaw_rate = np.stack([Trajectory.load(data.cache.trajectories[i], load_hexals=False).yaw_rate for i in idx])
-        rel_yaw = torch.atan2(batch["heading"][..., 0], batch["heading"][..., 1]).cpu().numpy()
+        yaw_rate = np.stack(
+            [
+                Trajectory.load(data.cache.trajectories[i], load_hexals=False).yaw_rate
+                for i in idx
+            ]
+        )
+        rel_yaw = (
+            torch.atan2(batch["heading"][..., 0], batch["heading"][..., 1])
+            .cpu()
+            .numpy()
+        )
         with torch.no_grad():
             s_real.append(model.sensory(x[:, : max(t0s)]).reshape(-1, 8).cpu().numpy())
             s_hover.append(model.sensory(x[:, :4]).mean(1).cpu().numpy())
@@ -122,12 +180,23 @@ def main(argv=None) -> int:
         snaps = snapshots(model, x, t0s)
         for t0, (v, r) in snaps.items():
             for cond, recurrent in (("recurrent", True), ("no_recurrence", False)):
-                series[cond].append(dark_series(model, dark_branch(model, v, r, blank, n_dark, recurrent), layout))
-            series["rest"].append(dark_series(model, dark_branch(model, v0, r0, blank, n_dark), layout))
+                series[cond].append(
+                    dark_series(
+                        model,
+                        dark_branch(model, v, r, blank, n_dark, recurrent),
+                        layout,
+                    )
+                )
+            series["rest"].append(
+                dark_series(model, dark_branch(model, v0, r0, blank, n_dark), layout)
+            )
             still.append(np.abs(yaw_rate[:, t0 - 50 : t0]).mean(1) < args.still_rate)
             off_axis.append(np.abs(rel_yaw[:, t0 - 1]) > np.deg2rad(45))
         del x, snaps
-    series = {c: {k: np.concatenate([s[k] for s in parts]) for k in parts[0]} for c, parts in series.items()}
+    series = {
+        c: {k: np.concatenate([s[k] for s in parts]) for k in parts[0]}
+        for c, parts in series.items()
+    }
     still_off_axis = np.concatenate(still) & np.concatenate(off_axis)
     subsets = {"all": np.ones_like(still_off_axis), "still_off_axis": still_off_axis}
 
@@ -137,11 +206,25 @@ def main(argv=None) -> int:
     stats = {}
     for name, mask in subsets.items():
         ref = {k: v[mask] for k, v in series["recurrent"].items()}
-        stats[name] = {c: dark_stats({k: v[mask] for k, v in s.items()}, steps + at, ref) for c, s in series.items()}
+        stats[name] = {
+            c: dark_stats({k: v[mask] for k, v in s.items()}, steps + at, ref)
+            for c, s in series.items()
+        }
     n_steps = len(steps)
-    curves = {name: {c: {k: v[:n_steps] for k, v in d.items()} for c, d in per.items()} for name, per in stats.items()}
-    table = {name: {c: {k: dict(zip([f"{a / hz:g}s" for a in at], v[n_steps:], strict=True)) for k, v in d.items()}
-                    for c, d in per.items()} for name, per in stats.items()}
+    curves = {
+        name: {c: {k: v[:n_steps] for k, v in d.items()} for c, d in per.items()}
+        for name, per in stats.items()
+    }
+    table = {
+        name: {
+            c: {
+                k: dict(zip([f"{a / hz:g}s" for a in at], v[n_steps:], strict=True))
+                for k, v in d.items()
+            }
+            for c, d in per.items()
+        }
+        for name, per in stats.items()
+    }
 
     s_real, s_hover = np.concatenate(s_real), np.concatenate(s_hover).mean(0)
     report = {
@@ -152,10 +235,15 @@ def main(argv=None) -> int:
         "dark_seconds": args.dark_seconds,
         "n_samples": {name: int(m.sum()) for name, m in subsets.items()},
         "still_rate_rad_s": args.still_rate,
-        "lptc_blank": {"channels": s_blank.round(3).tolist(), "hover_at_start": s_hover.round(3).tolist(),
-                       "real_mean": s_real.mean(0).round(3).tolist(), "real_sd": s_real.std(0).round(3).tolist(),
-                       "max_abs_blank_minus_hover_over_median_real_sd":
-                           float(np.abs(s_blank - s_hover).max() / np.median(s_real.std(0)))},
+        "lptc_blank": {
+            "channels": s_blank.round(3).tolist(),
+            "hover_at_start": s_hover.round(3).tolist(),
+            "real_mean": s_real.mean(0).round(3).tolist(),
+            "real_sd": s_real.std(0).round(3).tolist(),
+            "max_abs_blank_minus_hover_over_median_real_sd": float(
+                np.abs(s_blank - s_hover).max() / np.median(s_real.std(0))
+            ),
+        },
         "at": table,
         "curves": {"tau_s": taus, **curves},
     }
@@ -171,10 +259,12 @@ def main(argv=None) -> int:
         print("  ", report["lptc_blank"][k])
     for c in ("recurrent", "no_recurrence", "rest"):
         for t in sub[c]["ring_retention"]:
-            print(f"{c:14s} {t:>5s}  heading drift {sub[c]['heading_drift_deg_median'][t]:6.1f} deg  "
-                  f"ring drift {sub[c]['ring_drift_deg_median'][t]:6.1f} deg  "
-                  f"ring size {sub[c]['ring_retention'][t]:.2f}  decoder size {sub[c]['decoder_retention'][t]:.2f}  "
-                  f"fraction {sub[c]['ring_fraction'][t]:.2f}")
+            print(
+                f"{c:14s} {t:>5s}  heading drift {sub[c]['heading_drift_deg_median'][t]:6.1f} deg  "
+                f"ring drift {sub[c]['ring_drift_deg_median'][t]:6.1f} deg  "
+                f"ring size {sub[c]['ring_retention'][t]:.2f}  decoder size {sub[c]['decoder_retention'][t]:.2f}  "
+                f"fraction {sub[c]['ring_fraction'][t]:.2f}"
+            )
     print(f"wrote {out_dir / 'darkness.json'}")
     return 0
 

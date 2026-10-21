@@ -28,9 +28,13 @@ def count(model) -> dict[str, int]:
     }
     if core.input_dependent_alpha:
         rows["core.c (input-dependent alpha)"] = core.c.numel()
-    rows["input projection (ER only)"] = sum(p.numel() for p in model.inproj.parameters())
+    rows["input projection (ER only)"] = sum(
+        p.numel() for p in model.inproj.parameters()
+    )
     rows["heading decoder (EPG)"] = sum(p.numel() for p in model.heading.parameters())
-    rows["actor (PFL3) incl. log_std"] = sum(p.numel() for p in model.actor.parameters())
+    rows["actor (PFL3) incl. log_std"] = sum(
+        p.numel() for p in model.actor.parameters()
+    )
     rows["critic MLP (PPO only)"] = sum(p.numel() for p in model.critic.parameters())
     rows["LPTC"] = model.lptc.n_trainable() if model.lptc is not None else 0
     return rows
@@ -41,11 +45,15 @@ def main(argv=None) -> int:
     conn = build_connectome(cfg)
     k, d, p = len(cfg.lptc.channels), len(cfg.vision.cell_types), 721
     dummy = np.zeros((k, d, p), dtype=np.float32)
-    model = build_model(cfg, conn=conn, lptc=LPTCPool(dummy, mode=cfg.lptc.mode), verbose=False)
+    model = build_model(
+        cfg, conn=conn, lptc=LPTCPool(dummy, mode=cfg.lptc.mode), verbose=False
+    )
     rows = count(model)
     w = max(len(r) for r in rows)
-    print(f"\nsource={cfg.connectome.source} mask={cfg.connectome.mask_type} N={conn.n} "
-          f"edges={conn.n_edges} lptc.mode={cfg.lptc.mode}\n")
+    print(
+        f"\nsource={cfg.connectome.source} mask={cfg.connectome.mask_type} N={conn.n} "
+        f"edges={conn.n_edges} lptc.mode={cfg.lptc.mode}\n"
+    )
     for name, n in rows.items():
         print(f"  {name:<{w}}  {n:>10,d}")
     total = sum(rows.values())

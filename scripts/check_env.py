@@ -45,7 +45,9 @@ def row(name: str, status: str, detail: str) -> None:
 
 def _run(cmd: list[str], timeout: float = 20.0) -> str | None:
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=True)
+        out = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, check=True
+        )
         return out.stdout
     except Exception:
         return None
@@ -63,10 +65,16 @@ def check_wsl() -> None:
         return
     row("WSL", "PASS", "WSL detected")
     if str(REPO).startswith("/mnt/"):
-        row("WSL repo location", "FAIL", f"repo is under /mnt/ ({REPO}); move it to the Linux filesystem (~/...)")
+        row(
+            "WSL repo location",
+            "FAIL",
+            f"repo is under /mnt/ ({REPO}); move it to the Linux filesystem (~/...)",
+        )
     else:
         row("WSL repo location", "PASS", str(REPO))
-    NOTES.append("WSL: the WSL virtual disk (ext4.vhdx) lives on C: by default; data written here consumes C: space.")
+    NOTES.append(
+        "WSL: the WSL virtual disk (ext4.vhdx) lives on C: by default; data written here consumes C: space."
+    )
 
 
 def check_memory() -> None:
@@ -82,7 +90,11 @@ def check_memory() -> None:
         row("Memory", "WARN", f"MemTotal {gb:.1f} GB < 23 GB under WSL")
         NOTES.append(WSLCONFIG_SNIPPET)
     elif gb < 23:
-        row("Memory", "WARN", f"MemTotal {gb:.1f} GB < 23 GB (PPO with 12 envs may be tight)")
+        row(
+            "Memory",
+            "WARN",
+            f"MemTotal {gb:.1f} GB < 23 GB (PPO with 12 envs may be tight)",
+        )
     else:
         row("Memory", "PASS", f"MemTotal {gb:.1f} GB")
 
@@ -113,7 +125,8 @@ def check_cpu() -> None:
         maxmhz.setdefault(mhz, set()).add(parts[1])
         cpus_by_mhz[mhz] = cpus_by_mhz.get(mhz, 0) + 1
     summary = ", ".join(
-        f"{cpus_by_mhz[m]} threads/{len(maxmhz[m])} cores @ {m} MHz" for m in sorted(maxmhz, reverse=True)
+        f"{cpus_by_mhz[m]} threads/{len(maxmhz[m])} cores @ {m} MHz"
+        for m in sorted(maxmhz, reverse=True)
     )
     hint = ""
     if len(maxmhz) >= 2:
@@ -128,7 +141,13 @@ def check_cpu() -> None:
 
 
 def check_gpu() -> None:
-    out = _run(["nvidia-smi", "--query-gpu=name,driver_version,memory.total", "--format=csv,noheader"])
+    out = _run(
+        [
+            "nvidia-smi",
+            "--query-gpu=name,driver_version,memory.total",
+            "--format=csv,noheader",
+        ]
+    )
     if out is None:
         row("GPU (nvidia-smi)", "FAIL", "nvidia-smi not found or failed")
         return
@@ -140,20 +159,34 @@ def check_torch() -> None:
     try:
         import torch
     except ImportError:
-        row("PyTorch", "SKIP", "torch not importable (environment not created / not activated?)")
+        row(
+            "PyTorch",
+            "SKIP",
+            "torch not importable (environment not created / not activated?)",
+        )
         return
-    row("PyTorch", "PASS", f"torch {torch.__version__}, CUDA build {torch.version.cuda}")
+    row(
+        "PyTorch", "PASS", f"torch {torch.__version__}, CUDA build {torch.version.cuda}"
+    )
     if not torch.cuda.is_available():
         row("CUDA available", "FAIL", "torch.cuda.is_available() is False")
         return
     cap = torch.cuda.get_device_capability(0)
     arch = f"sm_{cap[0]}{cap[1]}"
     archs = torch.cuda.get_arch_list()
-    row("CUDA available", "PASS", f"{torch.cuda.get_device_name(0)}, capability {cap[0]}.{cap[1]}")
+    row(
+        "CUDA available",
+        "PASS",
+        f"{torch.cuda.get_device_name(0)}, capability {cap[0]}.{cap[1]}",
+    )
     if arch in archs:
         row("CUDA arch in build", "PASS", f"{arch} in {archs}")
     else:
-        row("CUDA arch in build", "FAIL", f"{arch} NOT in {archs}; install a wheel built for this GPU (cu128+)")
+        row(
+            "CUDA arch in build",
+            "FAIL",
+            f"{arch} NOT in {archs}; install a wheel built for this GPU (cu128+)",
+        )
     try:
         a = torch.randn(512, 512, device="cuda")
         b = (a @ a).sum().item()
@@ -178,17 +211,27 @@ def check_flyvis() -> None:
 
         row("flyvis import", "PASS", f"flyvis {version('flyvis')}")
     except Exception as e:
-        row("flyvis import", "SKIP" if isinstance(e, ImportError) else "FAIL", f"{type(e).__name__}: {e}")
+        row(
+            "flyvis import",
+            "SKIP" if isinstance(e, ImportError) else "FAIL",
+            f"{type(e).__name__}: {e}",
+        )
         return
     root = Path(os.environ["FLYVIS_ROOT_DIR"])
     if not root.is_absolute():
         root = (REPO / root).resolve()
     model_dir = root / "results" / "flow" / "0000" / "000"
     if model_dir.exists() and any(model_dir.rglob("*")):
-        shown = model_dir.relative_to(REPO) if model_dir.is_relative_to(REPO) else model_dir
+        shown = (
+            model_dir.relative_to(REPO) if model_dir.is_relative_to(REPO) else model_dir
+        )
         row("flyvis pretrained", "PASS", f"found {shown}")
     else:
-        row("flyvis pretrained", "FAIL", f"missing {model_dir}; run `make env` step 7 (flyvis download-pretrained)")
+        row(
+            "flyvis pretrained",
+            "FAIL",
+            f"missing {model_dir}; run `make env` step 7 (flyvis download-pretrained)",
+        )
 
 
 def _time_render(p, renderer: int, n: int = 30) -> float:
@@ -227,7 +270,11 @@ def check_pybullet() -> None:
         except Exception:
             egl_ms = None
         if egl_ms is None:
-            row("PyBullet EGL", "WARN", f"EGL plugin failed to load; TinyRenderer {tiny_ms:.2f} ms/frame @160x160")
+            row(
+                "PyBullet EGL",
+                "WARN",
+                f"EGL plugin failed to load; TinyRenderer {tiny_ms:.2f} ms/frame @160x160",
+            )
         else:
             row(
                 "PyBullet EGL",
@@ -250,14 +297,23 @@ def check_gymnasium() -> None:
 
         import gym_pybullet_drones  # noqa: F401
 
-        row("gym-pybullet-drones", "PASS", f"gym-pybullet-drones {version('gym-pybullet-drones')}")
+        row(
+            "gym-pybullet-drones",
+            "PASS",
+            f"gym-pybullet-drones {version('gym-pybullet-drones')}",
+        )
     except Exception as e:
         row("gym-pybullet-drones", "SKIP", f"{type(e).__name__}: {e}")
 
 
 def print_table() -> None:
     w0 = max(len(r[0]) for r in ROWS)
-    colors = {"PASS": "\033[32m", "WARN": "\033[33m", "FAIL": "\033[31m", "SKIP": "\033[90m"}
+    colors = {
+        "PASS": "\033[32m",
+        "WARN": "\033[33m",
+        "FAIL": "\033[31m",
+        "SKIP": "\033[90m",
+    }
     reset = "\033[0m" if sys.stdout.isatty() else ""
     print(f"\n{'check'.ljust(w0)}  status  detail")
     print("-" * (w0 + 2) + "  ------  " + "-" * 50)
@@ -271,7 +327,9 @@ def print_table() -> None:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--system", action="store_true", help="system-level checks only")
     args = ap.parse_args()
 
