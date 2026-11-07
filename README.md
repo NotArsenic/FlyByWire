@@ -14,31 +14,31 @@
   <img src="docs/media/fly_brain_3d.gif" width="920" alt="3D FlyWire reconstruction of the optic lobe pathway and central complex connectome">
 </p>
 
-_Figure 1. Three-dimensional reconstruction from FlyWire release 783 (`sk_lod1_783_healed_ds2.parquet`) showing the two neural systems coupled in this repository. Left panel displays the whole adult brain (139,273 neurons) with the frozen `flyvis` optic-lobe pathway (57 upstream retinotopic cell types in cyan and 8 direction-selective T4a-d / T5a-d output types in gold) feeding the midline central complex. Right panel shows a 4x midline zoom of all 457 reconstructed central-complex skeletons (17,041 directed edges thresholded at $\ge 5$ synapses) across the protocerebral bridge (PB), ellipsoid body (EB), lateral bulbs (BU), and lateral accessory lobe (LAL)._
+_Figure 1. Three-dimensional reconstruction from FlyWire release 783 (`sk_lod1_783_healed_ds2.parquet`) showing the two neural systems coupled in this repository. Left panel displays the whole adult brain (139,273 neurons) with the frozen `flyvis` optic-lobe pathway (57 upstream retinotopic cell types in cyan and 8 direction-selective T4a-d / T5a-d output types in gold) feeding the midline central complex. Right panel shows a 4x midline zoom of all 457 reconstructed central-complex skeletons (17,041 directed edges thresholded at ≥ 5 synapses) across the protocerebral bridge (PB), ellipsoid body (EB), lateral bulbs (BU), and lateral accessory lobe (LAL)._
 
 ---
 
 ## Abstract
 
-Fly-By-Wire is a closed-loop sensorimotor control system in which a simulated Crazyflie 2.x quadcopter navigates obstacle corridors using two biologically constrained neural stages. First-person grayscale video frames rendered at $100\text{ Hz}$ pass through a hexagonal retinal filter (`BoxEye`, $721$ ommatidia) into a frozen, pretrained connectome model of the _Drosophila_ optic lobe (`flyvis` model `flow/0000/000`, comprising $45{,}669$ neurons across $65$ cell types). Direction-selective ON ($\mathrm{T4a\text{-}d}$) and OFF ($\mathrm{T5a\text{-}d}$) motion detector voltages are rectified, baseline-subtracted, and pooled through lobula plate tangential cell (LPTC) flow templates into $8$ self-motion channels. These channels drive ellipsoid-body ring neurons ($\mathrm{ER}$) inside a single recurrent rate population of $N = 457$ neurons whose synaptic weight matrix is masked by the directed adjacency matrix of the FlyWire central complex ($\mathrm{ER}$, $\mathrm{EPG}$, $\mathrm{PEN}$, $\mathrm{PEG}$, $\Delta 7$, and $\mathrm{PFL3}$). Heading is decoded at $100\text{ Hz}$ exclusively from $\mathrm{EPG}$ compass wedge neurons, and body-frame flight commands $[v_{\text{fwd}}, v_{\text{lat}}, v_{\text{vert}}, \dot{\psi}]$ are read out at $25\text{ Hz}$ exclusively from $\mathrm{PFL3}$ descending output neurons.
+Fly-By-Wire is a closed-loop sensorimotor control system in which a simulated Crazyflie 2.x quadcopter navigates obstacle corridors using two biologically constrained neural stages. First-person grayscale video frames rendered at $100\text{ Hz}$ pass through a hexagonal retinal filter (`BoxEye`, $721$ ommatidia) into a frozen, pretrained connectome model of the _Drosophila_ optic lobe (`flyvis` model `flow/0000/000`, comprising $45{,}669$ neurons across $65$ cell types). Direction-selective ON ($\mathrm{T4a\text{-}d}$) and OFF ($\mathrm{T5a\text{-}d}$) motion detector voltages are rectified, baseline-subtracted, and pooled through lobula plate tangential cell (LPTC) flow templates into $8$ self-motion channels. These channels drive ellipsoid-body ring neurons ($\mathrm{ER}$) inside a single recurrent rate population of $N = 457$ neurons whose synaptic weight matrix is masked by the directed adjacency matrix of the FlyWire central complex ($\mathrm{ER}$, $\mathrm{EPG}$, $\mathrm{PEN}$, $\mathrm{PEG}$, $\Delta 7$, and $\mathrm{PFL3}$). Heading is decoded at $100\text{ Hz}$ exclusively from $\mathrm{EPG}$ compass wedge neurons, and body-frame flight commands $`[v_{\text{fwd}}, v_{\text{lat}}, v_{\text{vert}}, \dot{\psi}]`$ are read out at $25\text{ Hz}$ exclusively from $\mathrm{PFL3}$ descending output neurons.
 
 <p align="center">
   <img src="docs/media/progress.gif" width="920" alt="Closed-loop flight progression across training stages on a held-out slalom corridor">
 </p>
 
-_Figure 2. Closed-loop flight progression across training stages on held-out slalom corridor seed 10001 ($1.6\text{ m}$ obstacle spacing). Tile headers report closed-loop survival rates across 200 held-out slalom corridors._
+_Figure 2. Closed-loop flight progression across training stages on held-out slalom corridor seed 10001 (1.6 m obstacle spacing). Tile headers report closed-loop survival rates across 200 held-out slalom corridors._
 
 <p align="center">
   <img src="docs/media/dashboard_forest.gif" width="920" alt="Closed-loop flight through a held-out forest corridor with learnable LPTC templates">
 </p>
 
-_Figure 3. Closed-loop flight of the Stage 5b network (`lptc.mode=full`, $95.5$% survival over 200 held-out forest corridors) navigating a forest corridor with paired pillar rows spaced every $1.6\text{ m}$. Panels show the external chase view, hexagonal retinal input, top-down corridor trajectory, and 16-wedge $\mathrm{EPG}$ activity on the anatomical ellipsoid-body ring with true heading (solid red) and decoded heading (dashed cyan)._
+_Figure 3. Closed-loop flight of the Stage 5b network (`lptc.mode=full`, 95.5% survival over 200 held-out forest corridors) navigating a forest corridor with paired pillar rows spaced every 1.6 m. Panels show the external chase view, hexagonal retinal input, top-down corridor trajectory, and 16-wedge EPG activity on the anatomical ellipsoid-body ring with true heading (solid red) and decoded heading (dashed cyan)._
 
 <p align="center">
   <img src="docs/media/dashboard.gif" width="920" alt="Closed-loop slalom flight with scheduled EPG compass lesion at 6 seconds">
 </p>
 
-_Figure 4. Closed-loop flight on slalom corridor seed 10001 with $\mathrm{EPG}$ compass neurons silenced at $t = 6.0\text{ s}$. Silencing $\mathrm{EPG}$ extinguishes the ellipsoid-body bump, removes downstream drive to $\mathrm{PFL3}$, and causes the quadcopter to lose directional control._
+_Figure 4. Closed-loop flight on slalom corridor seed 10001 with EPG compass neurons silenced at t = 6.0 s. Silencing EPG extinguishes the ellipsoid-body bump, removes downstream drive to PFL3, and causes the quadcopter to lose directional control._
 
 ---
 
@@ -48,7 +48,7 @@ _Figure 4. Closed-loop flight on slalom corridor seed 10001 with $\mathrm{EPG}$ 
   <img src="docs/media/architecture.png" width="960" alt="Fly-By-Wire multi-rate control and neural architecture diagram">
 </p>
 
-_Figure 5. End-to-end architecture and clock-domain partitioning (compiled from [`docs/media/architecture.tex`](docs/media/architecture.tex)). Gradients stop at the $\mathrm{T4/T5}$ readout boundary. During offline behavior cloning, the trainable circuit reads precomputed fp16 $\mathrm{T4/T5}$ voltage trajectories directly from memory-mapped disk caches._
+_Figure 5. Closed-loop architecture (compiled from [`docs/media/architecture.tex`](docs/media/architecture.tex)). Grey blocks are frozen, pink blocks are trained, and each badge gives the block's clock rate. Gradients stop at the T4/T5 output of the optic lobe (dashed red line); behavior cloning reads cached fp16 T4/T5 voltages from disk and never runs flyvis._
 
 ### Multi-Rate Clock Hierarchy
 
@@ -66,9 +66,9 @@ An episode of $K$ control decisions spans exactly $T = 4K$ sensory steps. Enviro
 
 The recurrent core is built from FlyWire Codex snapshot 783 ([`flybywire/connectome/flywire.py`](flybywire/connectome/flywire.py)). Synaptic counts between each presynaptic and postsynaptic root ID are summed across all neuropils before applying the threshold `syn_count` $\ge 5$ and removing self-loops.
 
-| Cell Group      | Glob Pattern | Neurons ($N_g$) | Anatomical Compartments                                         | Circuit Role in Model                                                           |
+| Cell Group      | Glob Pattern | Neurons ($`N_g`$) | Anatomical Compartments                                         | Circuit Role in Model                                                           |
 | :-------------- | :----------- | :-------------: | :-------------------------------------------------------------- | :------------------------------------------------------------------------------ |
-| $\mathrm{ER}$   | `ER*`        |      $278$      | Lateral Bulbs (BU) $\to$ Ellipsoid Body (EB)                    | Exclusive target of visual self-motion projection $u_t$                         |
+| $\mathrm{ER}$   | `ER*`        |      $278$      | Lateral Bulbs (BU) $\to$ Ellipsoid Body (EB)                    | Exclusive target of visual self-motion projection $`u_t`$                         |
 | $\mathrm{EPG}$  | `EPG*`       |      $51$       | Ellipsoid Body (EB) $\leftrightarrow$ Protocerebral Bridge (PB) | Compass wedge neurons ($47$ $\mathrm{EPG}$ reliable in EB, $4$ $\mathrm{EPGt}$) |
 | $\mathrm{PEN}$  | `PEN*`       |      $42$       | Protocerebral Bridge (PB) $\to$ Ellipsoid Body (EB)             | Angular-velocity shift neurons (`PEN_a`/PEN1, `PEN_b`/PEN2)                     |
 | $\mathrm{PEG}$  | `PEG*`       |      $20$       | Protocerebral Bridge (PB) $\to$ Ellipsoid Body (EB)             | Recurrent bridge-to-ellipsoid maintenance neurons                               |
@@ -84,7 +84,7 @@ Parameter counts are reported by [`scripts/count_params.py`](scripts/count_param
 | :----------------------------------------------------------- | :------------------------------------------------------ | :-----------------: | :--------------------: | :-------------------: |
 | Connectome weights $W \odot M$                               | $\text{nnz}(M)$ on $457 \times 457$                     |     $17{,}041$      |       $17{,}041$       |      $17{,}041$       |
 | Core time constants & biases ($a, b$)                        | $457 + 457$                                             |        $914$        |         $914$          |         $914$         |
-| Input projection ($\mathrm{Proj}_{\mathcal{I}_{\text{ER}}}$) | $8 \times 278 + 278$                                    |      $2{,}502$      |       $2{,}502$        |       $2{,}502$       |
+| Input projection ($`\mathrm{Proj}_{\mathcal{I}_{\text{ER}}}`$) | $8 \times 278 + 278$                                    |      $2{,}502$      |       $2{,}502$        |       $2{,}502$       |
 | LPTC pooling (`LPTCPool`)                                    | $8 \times 8$ gains or $8 \times 8 \times 721$ templates |        $64$         |          $64$          |      $46{,}144$       |
 | Heading decoder ($\mathrm{EPG}$)                             | $51 \times 2 + 2$ or scalar gain + $\mathbb{R}^2$ bias  |        $104$        |          $3$           |          $3$          |
 | Actor head ($\mathrm{PFL3}$) + $\log\sigma$                  | $24 \times 4 + 4 + 4$                                   |        $104$        |         $104$          |         $104$         |
@@ -98,37 +98,37 @@ Parameter counts are reported by [`scripts/count_params.py`](scripts/count_param
 
 ### 1. Optic Flow to LPTC Channels
 
-Frames ($160 \times 160$, $110^\circ$ field of view, pitched down $10^\circ$) are filtered by `BoxEye` into $P = 721$ hexagonal ommatidia. For each of $K = 8$ basis motions (`yaw`, `pitch`, `roll`, `forward`, `lateral`, `vertical`, `loom_left`, `loom_right`) the ego-motion flow field $F_k(p)$ at hexal $p$ follows Longuet-Higgins and Prazdny (1980) ([`flybywire/vision/flowfields.py`](flybywire/vision/flowfields.py)). Each $\mathrm{T4/T5}$ subtype $d$ is calibrated on drifting gratings in $12$ directions to obtain its preferred direction $e_d$ and grey-screen baseline $\bar{a}_d$ ([`flybywire/vision/directions.py`](flybywire/vision/directions.py)). Templates $W_{k,d,p} \propto F_k(p) \cdot e_d$ are normalized per channel, and the frozen `flyvis` voltages $a_{d,p}(t)$ are pooled into $s(t) \in \mathbb{R}^8$ ([`flybywire/vision/lptc.py`](flybywire/vision/lptc.py)):
+Frames ($160 \times 160$, $110^\circ$ field of view, pitched down $10^\circ$) are filtered by `BoxEye` into $P = 721$ hexagonal ommatidia. For each of the $8$ basis motions $c$ (`yaw`, `pitch`, `roll`, `forward`, `lateral`, `vertical`, `loom_left`, `loom_right`) the ego-motion flow field $`F_c(p)`$ at hexal $p$ follows Longuet-Higgins and Prazdny (1980) ([`flybywire/vision/flowfields.py`](flybywire/vision/flowfields.py)). Each $\mathrm{T4/T5}$ subtype $d$ is calibrated on drifting gratings in $12$ directions to obtain its preferred direction $`e_d`$ and its mean rectified voltage on a grey screen, $`\bar{a}_d`$ ([`flybywire/vision/directions.py`](flybywire/vision/directions.py)). Templates $`W_{c,d,p} \propto F_c(p) \cdot e_d`$ are scaled to unit norm per channel, and the frozen `flyvis` voltages $`a_{d,p}(t)`$ are pooled into $s(t) \in \mathbb{R}^8$ ([`flybywire/vision/lptc.py`](flybywire/vision/lptc.py)):
 
-$$s_k(t) = \sum_{d=1}^{8} \sum_{p=1}^{721} g_{k,d} W_{k,d,p} \big(\max(0, a_{d,p}(t)) - \bar{a}_d\big)$$
+$$s_c(t) = \sum_{d=1}^{8} \sum_{p=1}^{721} g_{c,d} W_{c,d,p} \big(\max(0, a_{d,p}(t)) - \bar{a}_d\big)$$
 
-`lptc.mode=gains` trains only $g$ ($8 \times 8$); `lptc.mode=full` also trains the templates $W$ ($8 \times 8 \times 721$).
+`lptc.mode=gains` trains only the gains $g$ ($8 \times 8$) on fixed templates; `lptc.mode=full` trains the templates $W$ ($8 \times 8 \times 721$) and holds $g = 1$.
 
 ### 2. Connectome-Constrained Central Complex Dynamics
 
-$s_t$ is projected linearly onto the $278$ ring neurons $\mathcal{I}_{\text{ER}}$; the input $u_t$ is exactly zero on every other neuron. The core is a single leaky rate population stepped at $\Delta t = 10\text{ ms}$ in fp32 ([`flybywire/core/population.py`](flybywire/core/population.py)):
+$`s_t`$ is projected linearly onto the $278$ ring neurons $`\mathcal{I}_{\text{ER}}`$; the input $`u_t`$ is exactly zero on every other neuron. The core is a single leaky rate population stepped at $\Delta t = 10\text{ ms}$ in fp32 ([`flybywire/core/population.py`](flybywire/core/population.py)):
 
 $$r_t = \phi(v_t) \odot m_{\text{keep}}, \qquad v_{t+1} = (1 - \alpha) \odot v_t + \alpha \odot \big(r_t (W \odot M) + u_t + b\big)$$
 
-$\phi$ is softplus, $\alpha = \sigma(a)$ is a learned per-neuron leak (initialized at $\alpha_0 = 0.2$, $\tau \approx 50\text{ ms}$), $M$ is the boolean FlyWire adjacency ($M_{ij} = 1$ for presynaptic $i \to$ postsynaptic $j$), and $m_{\text{keep}}$ zeroes lesioned cell types. On-mask weights start from $\mathcal{N}(0, \sigma_W^2)$ with $\sigma_W = 0.5 / \sqrt{\bar{d}_{\text{in}}}$ ($\bar{d}_{\text{in}} = 37.29$).
+$\phi$ is softplus, $\alpha = \sigma(a)$ is a learned per-neuron leak (initialized at $`\alpha_0 = 0.2`$, i.e. $`\tau = \Delta t / \alpha_0 = 50\text{ ms}`$), $M$ is the boolean FlyWire adjacency ($`M_{ij} = 1`$ for presynaptic $i \to$ postsynaptic $j$), and $`m_{\text{keep}}`$ zeroes lesioned cell types. On-mask weights start from $`\mathcal{N}(0, \sigma_W^2)`$ with $`\sigma_W = 0.5 / \sqrt{\bar{d}_{\text{in}}}`$ ($`\bar{d}_{\text{in}} = 37.29`$).
 
 ### 3. Readouts
 
-The heading target is $h_t = (\sin\Delta\psi_t, \cos\Delta\psi_t)$ with $\Delta\psi_t = \mathrm{wrap}(\psi_t - \psi_0)$. The **learned** decoder is linear on the $51$ $\mathrm{EPG}$ rates. The **anatomical** decoder ([`flybywire/core/heads.py`](flybywire/core/heads.py)) gives each of the $47$ reliable $\mathrm{EPG}$ neurons its arbor angle $\theta_i$ on the ellipsoid-body ring, measured on the FlyWire skeletons ([`scripts/epg_anatomy.py`](scripts/epg_anatomy.py)), and trains only a gain and bias: $\hat{h}_t = \gamma \sum_i r_{t,i} (\sin\theta_i, \cos\theta_i) + b_{\text{head}}$. Bump share ([`flybywire/eval/ring.py`](flybywire/eval/ring.py)) is the first-harmonic fraction $|P_1|^2 / \sum_{m=1}^{8} |P_m|^2$ of the Fourier power of the $16$-wedge $\mathrm{EPG}$ profile.
+The heading target is $`h_t = (\sin\Delta\psi_t, \cos\Delta\psi_t)`$ with $`\Delta\psi_t = \mathrm{wrap}(\psi_t - \psi_0)`$. The **learned** decoder is linear on the $51$ $\mathrm{EPG}$ rates. The **anatomical** decoder ([`flybywire/core/heads.py`](flybywire/core/heads.py)) gives each of the $47$ reliable $\mathrm{EPG}$ neurons its arbor angle $`\theta_i`$ on the ellipsoid-body ring, measured on the FlyWire skeletons ([`scripts/epg_anatomy.py`](scripts/epg_anatomy.py)), and trains only a gain and bias: $`\hat{h}_t = \gamma \sum_i r_{t,i} (\sin\theta_i, \cos\theta_i) + b_{\text{head}}`$. Bump share ([`flybywire/eval/ring.py`](flybywire/eval/ring.py)) is the first-harmonic fraction $`|P_1|^2 / \sum_{m=1}^{8} |P_m|^2`$ of the Fourier power of the $16$-wedge $\mathrm{EPG}$ profile.
 
-At decision $k$ (sensory tick $t = 4k + 3$) the actor reads only $\mathrm{PFL3}$: $\mu_k = \tanh(W_{\text{act}} r_t^{\mathrm{PFL3}} + b_{\text{act}}) \in [-1, 1]^4$, scaled to $v_{\text{fwd}} \in [0, 2]\text{ m/s}$, $v_{\text{lat}} \in [-1, 1]\text{ m/s}$, $v_{\text{vert}} \in [-0.5, 0.5]\text{ m/s}$ and $\dot{\psi} \in [-3, 3]\text{ rad/s}$.
+At decision $k$ (sensory tick $t = 4k + 3$) the actor reads only $\mathrm{PFL3}$: $`\mu_k = \tanh(W_{\text{act}} r_t^{\mathrm{PFL3}} + b_{\text{act}}) \in [-1, 1]^4`$, scaled to $`v_{\text{fwd}} \in [0, 2]\text{ m/s}`$, $`v_{\text{lat}} \in [-1, 1]\text{ m/s}`$, $`v_{\text{vert}} \in [-0.5, 0.5]\text{ m/s}`$ and $\dot{\psi} \in [-3, 3]\text{ rad/s}$.
 
 ### 4. Training Objectives
 
-**Behavior Cloning.** Truncated BPTT over windows of $L = 128$ sensory steps ($32$ decisions) from $t = 0$ of each episode, with detached state carried across windows ([`flybywire/train/bc.py`](flybywire/train/bc.py)). Action and heading errors are averaged over the decisions $\mathcal{D}_w$ and steps $\mathcal{T}_w$ of each window:
+**Behavior Cloning.** Truncated BPTT over windows of $L = 128$ sensory steps ($32$ decisions) from $t = 0$ of each episode, with detached state carried across windows ([`flybywire/train/bc.py`](flybywire/train/bc.py)). Action and heading errors are averaged over the decisions $`\mathcal{D}_w`$ and steps $`\mathcal{T}_w`$ of each window:
 
 $$\mathcal{L}_{\text{BC}} = \mathrm{MSE}_{k \in \mathcal{D}_w}(\mu_k, a_k^*) + \lambda_{\text{aux}} \mathrm{MSE}_{t \in \mathcal{T}_w}(\hat{h}_t, h_t), \qquad \lambda_{\text{aux}} = 0.5$$
 
-**PPO.** Clipped surrogate ($\epsilon = 0.2$) with GAE ($\gamma = 0.99$, $\lambda = 0.95$), a value critic on detached rates, the auxiliary heading loss, and a KL anchor $\beta_u D_{\text{KL}}(\pi_\theta, \pi_{\text{BC}})$ whose weight decays from $0.10$ to a floor of $0.05$ over $50$ updates after a $12$-update critic warmup ([`flybywire/train/ppo.py`](flybywire/train/ppo.py)).
+**PPO.** Clipped surrogate ($\epsilon = 0.2$) with GAE ($\gamma = 0.99$, $\lambda = 0.95$), a value critic on detached rates, the auxiliary heading loss, and a KL anchor $`\beta_n D_{\mathrm{KL}}(\pi_\theta \Vert \pi_{\text{BC}})`$ to the frozen BC policy, whose weight at update $n$ is held at $0.10$ through a $12$-update critic warmup and then decays linearly to a floor of $0.05$ over $50$ updates ([`flybywire/train/ppo.py`](flybywire/train/ppo.py)).
 
 ### 5. Directed Degree-Preserving Null Model
 
-The `rewire` condition ([`flybywire/connectome/rewire.py`](flybywire/connectome/rewire.py)) applies $10 \times |E| = 170{,}410$ accepted directed double-edge swaps $(a \to b, c \to d) \mapsto (a \to d, c \to b)$ over four distinct neurons, rejecting swaps that would create an existing edge. Every neuron keeps its exact in- and out-degree, and edge overlap with the FlyWire graph drops to $9.3$%.
+The `rewire` condition ([`flybywire/connectome/rewire.py`](flybywire/connectome/rewire.py)) applies $10 \times |E| = 170{,}410$ accepted directed double-edge swaps $(a \to b, c \to d) \mapsto (a \to d, c \to b)$ over four distinct neurons, rejecting swaps that would create an existing edge. Every neuron keeps its exact in- and out-degree, and $18.2\text{-}18.8$% of the FlyWire edges survive (rewire seeds $0\text{-}2$).
 
 ---
 
@@ -152,12 +152,12 @@ Controlled comparisons between the biological FlyWire adjacency matrix (`real`) 
 
 Trained on $1{,}600$ episodes ($1{,}000$ turning-expert episodes with Ornstein-Uhlenbeck execution noise plus two DAgger rounds of $300$ episodes each) and evaluated open-loop on $100$ held-out test episodes and closed-loop on $200$ held-out corridors per seed. Closed-loop confidence intervals treat the training seed as the experimental unit ($t$-interval across seed rates).
 
-| Mask / Readout          |    Seeds     | Open-Loop Heading $R^2$ | Anatomical Bump Share |           Closed-Loop per Seed ($s_0, s_1, s_2$)           | Closed-Loop Mean [95% CI] |
+| Mask / Readout          |    Seeds     | Open-Loop Heading $R^2$ | Anatomical Bump Share |           Closed-Loop per Seed ($`s_0, s_1, s_2`$)           | Closed-Loop Mean over $`s_{0\text{-}2}`$ [95% CI] |
 | :---------------------- | :----------: | :---------------------: | :-------------------: | :--------------------------------------------------------: | :-----------------------: |
 | `real` / `learned`      | $0\text{-}2$ |         $0.907$         |    $0.14 \pm 0.06$    |                    $76.0, 45.0, 76.5$%                     |    $65.8$% $[21, 100]$    |
 | `rewire` / `learned`    | $0\text{-}2$ |         $0.919$         |    $0.17 \pm 0.04$    |                    $83.0, 88.5, 89.5$%                     |    $87.0$% $[78, 96]$     |
-| `real` / `anatomical`   | $0\text{-}5$ |         $0.920$         |    $0.32 \pm 0.04$    | $61.0, 78.5, 67.0$% ($s_{3\text{-}5}$ $73.0, 59.0, 79.5$%) |    $68.8$% $[47, 91]$     |
-| `rewire` / `anatomical` | $0\text{-}5$ |         $0.923$         |    $0.32 \pm 0.05$    |                    $75.0, 87.0, 78.5$%                     |    $80.2$% $[65, 96]$     |
+| `real` / `anatomical`   | $0\text{-}5$ |         $0.920$         |    $0.32 \pm 0.04$    | $61.0, 78.5, 67.0$% ($`s_{3\text{-}5}`$ $73.0, 59.0, 79.5$%) |    $68.8$% $[47, 91]$     |
+| `rewire` / `anatomical` | $0\text{-}5$ |         $0.923$         |    $0.32 \pm 0.05$    |                    $75.0, 87.0, 78.5$%                     |    $80.2$% $[65, 95]$     |
 
 Across the $12$ anatomical-readout runs, `real` and `rewire` produce identical first-harmonic bump shares ($0.322$ vs $0.322$, two-sided exact permutation $p = 0.998$). Over the $12$ closed-loop seed evaluations, `rewire` achieves a higher mean survival rate ($83.6$% vs $67.3$%, post-hoc permutation $p = 0.015$).
 
@@ -180,7 +180,7 @@ Time-freeze pause training reduces 2-second heading drift under a held visual fr
 
 ### Visual Bottleneck Probe and Curriculum Progression
 
-When evaluated on denser obstacle layouts, networks using fixed 8-channel LPTC flow templates (`lptc.mode=gains`) occasionally collided with pillars positioned directly on the flight axis. A diagnostic classification probe ([`scripts/probe_pillar_dodge.py`](scripts/probe_pillar_dodge.py)) across $53{,}183$ expert decisions ($1.0\text{-}2.5\text{ m}$ from an obstacle row) measured whether the expert's lateral dodge direction ($\mathrm{sign}(v_y)$) is linearly decodable from visual features when a pillar lies dead ahead ($|\Delta y| \le 0.35\text{ m}$).
+When evaluated on denser obstacle layouts, networks using fixed 8-channel LPTC flow templates (`lptc.mode=gains`) occasionally collided with pillars positioned directly on the flight axis. A diagnostic classification probe ([`scripts/probe_pillar_dodge.py`](scripts/probe_pillar_dodge.py)) across $53{,}183$ expert decisions ($1.0\text{-}2.5\text{ m}$ from an obstacle row) measured whether the expert's lateral dodge direction ($`\mathrm{sign}(v_y)`$) is linearly decodable from visual features when a pillar lies dead ahead ($|\Delta y| \le 0.35\text{ m}$).
 
 | Feature Representation                                   |    Feature Dimension     | Linear Probe (All / Dead Ahead) | 2-Layer MLP Probe (All / Dead Ahead) |
 | :------------------------------------------------------- | :----------------------: | :-----------------------------: | :----------------------------------: |
@@ -216,7 +216,7 @@ Inference-time silencing (`m_keep[group] = 0`) across $200$ held-out default cor
 
 ### Reinforcement Learning Fine-Tuning
 
-PPO fine-tuning ([`flybywire/train/ppo.py`](flybywire/train/ppo.py)) was evaluated from Stage 3 (`real_anatomical_s5`, $79.5$% test survival) and Stage 4 (`dense_s5`, $65.0$% forest survival) across three hyperparameter regimes varying collision penalty ($-10$ vs $-100$), rollout horizon ($128$ vs $256$ decisions), exploration standard deviation ($\sigma = 0.22$ vs $0.10$), and KL anchor floor ($\beta_{\min} = 0.05$). While stochastic rollout success remained at $75\text{-}82$%, evaluating the deterministic action mean $\mu_k$ on unseen validation seeds ($20000\dots 20099$) peaked at $75.0$% on default corridors and $73.0$% on forest corridors, matching but not exceeding the behavior-cloned checkpoints.
+PPO fine-tuning ([`flybywire/train/ppo.py`](flybywire/train/ppo.py)) was evaluated from Stage 3 (`real_anatomical_s5`, $79.5$% test survival) and Stage 4 (`dense_s5`, $65.0$% forest survival) across three hyperparameter regimes varying collision penalty ($-10$ vs $-100$), rollout horizon ($128$ vs $256$ decisions), exploration standard deviation ($\sigma = 0.22$ vs $0.10$), and KL anchor floor ($`\beta_{\min} = 0.05`$). While stochastic rollout success remained at $75\text{-}82$%, evaluating the deterministic action mean $`\mu_k`$ on unseen validation seeds ($20000\dots 20099$) peaked at $75.0$% on default corridors and $73.0$% on forest corridors, matching but not exceeding the behavior-cloned checkpoints.
 
 ---
 
