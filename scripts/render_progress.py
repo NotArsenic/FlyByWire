@@ -23,6 +23,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from flybywire.gif import save_gif
+
 
 def untrained_checkpoint(like: str, path: Path) -> str:
     from omegaconf import OmegaConf
@@ -91,7 +93,7 @@ def main(argv=None) -> int:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     imageio.mimwrite(out.with_suffix(".mp4"), frames, fps=25, codec="libx264", quality=7, macro_block_size=8)
-    imageio.mimwrite(out, [f[::2, ::2] for f in frames[::2]], duration=80, loop=0)
+    save_gif(frames[::2], out, 12.5)
     print(f"wrote {out} and {out.with_suffix('.mp4')}: {len(frames)} frames")
     for (label, _), f in zip(stages, flights, strict=True):
         print(f"  {label}: {f.reason} at {f.time:.1f} s")

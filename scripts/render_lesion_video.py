@@ -23,6 +23,7 @@ import argparse
 from pathlib import Path
 
 from flybywire.config import REPO_ROOT
+from flybywire.gif import save_gif
 
 
 def parse_schedule(items) -> list[tuple[tuple[str, ...], float, float]]:
@@ -61,7 +62,7 @@ def main(argv=None) -> int:
     ap.add_argument(
         "--gif",
         default=None,
-        help="also write a smaller GIF (every 2nd frame, half size)",
+        help="also write a GIF (full size, every 2nd frame)",
     )
     ap.add_argument("--seed", type=int, default=10003)
     ap.add_argument("--seconds", type=float, default=20.0)
@@ -114,8 +115,7 @@ def main(argv=None) -> int:
     )
     print(f"wrote {out}: {len(frames)} frames, episode ended by {end}")
     if args.gif:
-        small = [f[::2, ::2] for f in frames[::2]]
-        imageio.mimwrite(args.gif, small, duration=2 / fps, loop=0)
+        save_gif(frames[::2], args.gif, fps / 2)  # half the frame rate keeps the file a few MB
         print(f"wrote {args.gif}")
     return 0
 

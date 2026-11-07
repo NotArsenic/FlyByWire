@@ -26,6 +26,7 @@ import pyarrow.parquet as pq
 from PIL import Image, ImageDraw, ImageFont
 
 from flybywire.config import REPO_ROOT, data_dir, load_config
+from flybywire.gif import save_gif
 
 T4T5_TYPES = {"T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d"}
 OL_UPSTREAM_TYPES = {
@@ -379,12 +380,7 @@ def main(argv=None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     mp4_path = out.with_suffix(".mp4")
     imageio.mimwrite(mp4_path, frames, fps=args.fps, codec="libx264", quality=8, macro_block_size=8)
-
-    # Quantize to a shared adaptive 256-color palette per frame with dithering off for a clean, compact GIF
-    gif_frames = [
-        cv2.resize(f, (960, 480), interpolation=cv2.INTER_AREA) for f in frames
-    ]
-    imageio.mimwrite(out, gif_frames, duration=int(round(1000 / args.fps)), loop=0)
+    save_gif(frames, out, args.fps)
     print(f"wrote {out} and {mp4_path} ({len(frames)} frames)")
     return 0
 

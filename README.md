@@ -430,14 +430,14 @@ python scripts/render_progress.py --out docs/media/progress.gif --seed 10001 --s
 # 3. Closed-loop forest corridor flight GIF (Figure 3)
 python scripts/render_lesion_video.py --ckpt runs/curriculum/forest_full_s5/model.pt \
     --out docs/media/dashboard_forest.mp4 --gif docs/media/dashboard_forest.gif \
-    --seed 10001 --seconds 10 --schedule \
-    env.obstacle_spacing_m=1.6 env.n_obstacles=20 env.pair_prob=0.5
+    --seed 10001 --seconds 10 \
+    env.obstacle_spacing_m=1.6 env.n_obstacles=20 env.pair_prob=0.5 --schedule
 
 # 4. Closed-loop slalom flight with mid-flight EPG lesion at t = 6 s (Figure 4)
 python scripts/render_lesion_video.py --ckpt runs/curriculum/dense_s5/model.pt \
     --out docs/media/dashboard.mp4 --gif docs/media/dashboard.gif \
-    --seed 10001 --seconds 12 --schedule EPG:6-12 \
-    env.obstacle_spacing_m=1.6 env.n_obstacles=14
+    --seed 10001 --seconds 12 \
+    env.obstacle_spacing_m=1.6 env.n_obstacles=14 --schedule EPG:6-12
 
 # 5. Compile TikZ architecture diagram to PDF and 300-DPI PNG (Figure 5)
 pdflatex -interaction=nonstopmode -output-directory=docs/media docs/media/architecture.tex
