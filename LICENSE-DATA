@@ -1,0 +1,36 @@
+FlyWire-derived files
+
+The code in this repository is under the MIT License (LICENSE). The files listed below are derived
+from the FlyWire connectome and are instead released under the Creative Commons
+Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0):
+https://creativecommons.org/licenses/by-nc/4.0/
+
+  runs/**/*.pt
+      Model checkpoints. Each stores the central-complex adjacency matrix (core.M) and cell-type
+      index sets built from FlyWire snapshot 783 connections and cell-type annotations, synaptic
+      weights trained on that adjacency, and, for the anatomical heading decoder, EPG
+      ellipsoid-body angles measured on FlyWire neuron skeletons.
+
+  docs/media/fly_brain_3d.gif
+      Rendered from FlyWire snapshot 783 neuron skeletons and cell-type annotations.
+
+Changes made to the source data: synapse counts summed per neuron pair across neuropils,
+thresholded at 5 synapses, self-loops removed, and restricted to 457 central-complex neurons
+(ER, EPG, PEN, PEG, Delta7, PFL3); skeletons downsampled for rendering.
+
+FlyWire states that published versions of its data are available under CC BY-NC 4.0
+(https://edit.flywire.ai/principles.html). Some FlyWire releases on Zenodo carry CC BY 4.0
+(doi:10.5281/zenodo.10676866, doi:10.5281/zenodo.10877326); the stricter terms are used here
+because the connectivity and annotation tables were downloaded from FlyWire Codex.
+
+Attribution. When using these files, cite:
+
+  Dorkenwald, S. et al. (2024). Neuronal wiring diagram of an adult brain. Nature 634, 124-138.
+  doi:10.1038/s41586-024-07558-y
+
+  Schlegel, P. et al. (2024). Whole-brain annotation and multi-connectome cell typing of
+  Drosophila. Nature 634, 139-152. doi:10.1038/s41586-024-07686-5
+
+  FlyWire Codex. doi:10.13140/RG.2.2.35928.67844
+
+and this repository (see the Citation section of README.md).

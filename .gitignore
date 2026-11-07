@@ -2,6 +2,7 @@
 data/*
 !data/README.md
 runs/*
+# the README checkpoints are tracked anyway (git add -f); see "Pretrained Checkpoints"
 !runs/.gitkeep
 wandb/
 .env

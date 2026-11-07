@@ -6,7 +6,7 @@
 [![Connectome FlyWire 783](<https://img.shields.io/badge/connectome-FlyWire_v783_(N%3D457)-db2777.svg>)](https://www.nature.com/articles/s41586-024-07558-y)
 [![Simulation Env PyBullet 200Hz](https://img.shields.io/badge/simulation_env-PyBullet_200Hz-0284c7.svg)](flybywire/envs/corridor.py)
 [![RL PPO](https://img.shields.io/badge/RL-PPO-16a34a.svg)](flybywire/train/ppo.py)
-[![License MIT](https://img.shields.io/badge/license-MIT-475569.svg)](LICENSE)
+[![License MIT code, CC BY-NC weights](https://img.shields.io/badge/license-MIT_code_%7C_CC_BY--NC_weights-475569.svg)](#license)
 
 **Connectome-constrained visual flight control coupling a frozen _Drosophila_ optic-lobe network (`flyvis`) to a recurrent central-complex circuit wired from the FlyWire adult brain connectome.**
 
@@ -282,6 +282,19 @@ python -I scripts/epg_anatomy.py data/flywire/skeletons/sk_lod1_783_healed_ds2.p
     --out data/flywire/processed/epg_eb_angles.npz --report-dir runs/anatomy
 ```
 
+### Pretrained Checkpoints
+
+The checkpoints behind the results and figures are tracked in the repository at the paths the commands below use (about 1.4 MB each, CC BY-NC 4.0, see [License](#license)). Loading one still builds the model from `data/flywire/processed/cx_graph.npz`, `data/flywire/processed/epg_eb_angles.npz` and `data/flyvis/direction_map.json`, so complete the data setup above and `make calibrate` first.
+
+| Stage                                  | Checkpoint                                       |
+| :------------------------------------- | :----------------------------------------------- |
+| 1. BC, plain expert                    | `runs/bc/real_s0/model.pt`                       |
+| 2. BC, turning expert                  | `runs/bc/turns_s0/model_best.pt`                 |
+| 3. BC, DART + DAgger                   | `runs/sweep_dart/real_anatomical_s5/model_best.pt` |
+| 4. + Spaced/Dense/Slalom               | `runs/curriculum/dense_s5/model.pt`              |
+| 5a. + Forest, `lptc.mode=gains`        | `runs/curriculum/forest_gains_s5/model.pt`       |
+| 5b. + Forest, `lptc.mode=full`         | `runs/curriculum/forest_full_s5/model.pt`        |
+
 ### Storage Footprint
 
 | Artifact                                                                           | Measured Disk Size                                                                     |
@@ -545,4 +558,4 @@ Please also cite `flyvis` (Lappalainen et al., 2024) and FlyWire (Dorkenwald et 
 
 ## License
 
-Released under the MIT License. See [`LICENSE`](LICENSE) for details.
+The code is released under the MIT License ([`LICENSE`](LICENSE)). The model checkpoints under `runs/` and `docs/media/fly_brain_3d.gif` contain or are rendered from FlyWire connectome data and are released under CC BY-NC 4.0 ([`LICENSE-DATA`](LICENSE-DATA)): they may not be used commercially, and reuse must cite FlyWire (Dorkenwald et al., 2024; Schlegel et al., 2024).
